@@ -6,6 +6,7 @@ public class GridManager : MonoBehaviour {
 
     [SerializeField] private int Width, Height;
     [SerializeField] private Tile _tilePrefab;
+    [SerializeField] private Transform _cam;
     void Start()
     {
         GenerateGrid();
@@ -18,7 +19,15 @@ public class GridManager : MonoBehaviour {
             {
                 var spawnedTile = Instantiate(_tilePrefab, new Vector3(x, y), Quaternion.identity);
                 spawnedTile.name = $"Tile {x} {y}";
+
+                var isOffset = (x % 2 == 0&& y % 2 != 0) || (x % 2 != 0 && y % 2 == 0);
+                spawnedTile.Init(isOffset);
+                //if (isOffset)
+                //{
+                //    spawnedTile.transform.position += new Vector3(0.5f, 0.5f, 0);
+                //}
             }
         }
+        _cam.transform.position = new Vector3((float)Width / 2 - 0.5f, (float)Height / 2 - 0.5f, -10);
     }
 }
