@@ -30,7 +30,7 @@ public class MainMenuManager : MonoBehaviour
     public void OnStartGame()
     {
         Debug.Log("点击开始游戏，准备进入对局");
-        SceneManager.LoadScene("GameScene");
+        SceneManager.LoadScene("CharacterPanelTest");
     }
 
     public void OnQuitGame()

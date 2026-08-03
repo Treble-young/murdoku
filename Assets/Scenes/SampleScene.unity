@@ -315,6 +315,7 @@ GameObject:
   - component: {fileID: 451101671}
   - component: {fileID: 451101670}
   - component: {fileID: 451101673}
+  - component: {fileID: 451101674}
   m_Layer: 5
   m_Name: start
   m_TagString: Untagged
@@ -452,6 +453,18 @@ MonoBehaviour:
   normalColor: {r: 0.47058824, g: 0.47058824, b: 0.47058824, a: 1}
   highlightColor: {r: 1, g: 1, b: 1, a: 1}
   pressedColor: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &451101674
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 451101668}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5924a6552ef5bd4f9132324ac1fdb2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SceneSwitch
 --- !u!1 &479092755
 GameObject:
   m_ObjectHideFlags: 0
