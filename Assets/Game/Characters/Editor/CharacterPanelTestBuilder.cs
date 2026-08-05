@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Murdoku.Characters;
+using Murdoku.PuzzleEditor;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -103,6 +104,7 @@ namespace Murdoku.Characters.Editor
             CreateCharacterCardPrefab();
             CreateCharacterPanelPrefab();
             CreateTestBoardCellPrefab();
+            CreateBoardSizePanelPrefab();
 
             // Flush temporary scene-object identities before loading the saved prefabs.
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -153,6 +155,25 @@ namespace Murdoku.Characters.Editor
             Require(boardSerialized.FindProperty("columns").intValue == 6, "Test board column count must be 6.");
             Require(boardSerialized.FindProperty("gridRoot").objectReferenceValue != null, "TestBoardController.GridRoot is not assigned.");
             Require(boardSerialized.FindProperty("cellPrefab").objectReferenceValue != null, "TestBoardController.CellPrefab is not assigned.");
+            RectTransform testGridRect = boardSerialized.FindProperty("gridRoot").objectReferenceValue as RectTransform;
+            Require(
+                testGridRect != null && Mathf.Approximately(testGridRect.sizeDelta.x, 880f) &&
+                Mathf.Approximately(testGridRect.sizeDelta.y, 880f),
+                "TestGrid sizeDelta must be 880×880.");
+
+            BoardSizePanelUI boardSizePanel = FindSingleSceneComponent<BoardSizePanelUI>(scene);
+            SerializedObject sizeSerialized = new SerializedObject(boardSizePanel);
+            Require(sizeSerialized.FindProperty("sizeInput").objectReferenceValue != null, "BoardSizePanelUI.SizeInput is not assigned.");
+            Require(sizeSerialized.FindProperty("generateButton").objectReferenceValue != null, "BoardSizePanelUI.GenerateButton is not assigned.");
+            Require(sizeSerialized.FindProperty("hintText").objectReferenceValue != null, "BoardSizePanelUI.HintText is not assigned.");
+            Require(sizeSerialized.FindProperty("placeModeButton").objectReferenceValue != null, "BoardSizePanelUI.PlaceModeButton is not assigned.");
+            Require(sizeSerialized.FindProperty("wallModeButton").objectReferenceValue != null, "BoardSizePanelUI.WallModeButton is not assigned.");
+            Require(sizeSerialized.FindProperty("boardController").objectReferenceValue == board, "BoardSizePanelUI.BoardController is not assigned to the test board.");
+            Require(sizeSerialized.FindProperty("wallEditController").objectReferenceValue != null, "BoardSizePanelUI.WallEditController is not assigned.");
+
+            WallEditController wallEdit = FindSingleSceneComponent<WallEditController>(scene);
+            SerializedObject wallSerialized = new SerializedObject(wallEdit);
+            Require(wallSerialized.FindProperty("board").objectReferenceValue == board, "WallEditController.Board is not assigned to the test board.");
 
             foreach (EditorBuildSettingsScene buildScene in EditorBuildSettings.scenes)
             {
@@ -245,6 +266,100 @@ namespace Murdoku.Characters.Editor
                 EditorApplication.isPlaying = true;
                 Debug.Log("Opened CharacterPanelTest.unity and entered Play Mode.");
             };
+        }
+
+        [MenuItem("Tools/Murdoku/Rebuild Board Panel Layout")]
+        public static void RebuildBoardPanelLayout()
+        {
+            RequireExactEditorVersion();
+
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+            // 1. 删除顶部两个文本：棋盘标题与放置状态提示。
+            DestroySceneObjectsByName(scene, "BoardTitle");
+            DestroySceneObjectsByName(scene, "PlacementStatusText");
+
+            // 2. 放大棋盘区域：从 712×712 调整到 880×880，让大尺寸棋盘的格子更大。
+            RectTransform testGrid = FindChildByName<RectTransform>(scene, "TestGrid");
+            Require(testGrid != null, "CharacterPanelTest is missing the TestGrid.");
+            testGrid.sizeDelta = new Vector2(880f, 880f);
+
+            // 3. 优先复用现有 prefab（避免运行时强制重写资源被锁），缺失时才生成。
+            GameObject boardSizePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                $"{PrefabRoot}/BoardSizePanel.prefab");
+            if (boardSizePrefab == null || boardSizePrefab.GetComponent<BoardSizePanelUI>() == null)
+            {
+                CreateBoardSizePanelPrefab();
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            }
+
+            // 实例化前强制重新加载，确保引用最新且有效的 prefab 资源对象。
+            boardSizePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                $"{PrefabRoot}/BoardSizePanel.prefab");
+            Require(
+                boardSizePrefab != null && boardSizePrefab.GetComponent<BoardSizePanelUI>() != null,
+                $"Failed to load {PrefabRoot}/BoardSizePanel.prefab.");
+
+            // 4. 先实例化新的控制条并完成绑定（失败时旧控制条仍保留，不会丢失）。
+            TestBoardController board = FindSingleSceneComponent<TestBoardController>(scene);
+            SetFloat(board, "maxCellSize", 128f);
+
+            WallEditController[] existingWalls = FindSceneComponents<WallEditController>(scene);
+            WallEditController wallEdit = existingWalls.Length == 0 ? null : existingWalls[0];
+            if (wallEdit == null)
+            {
+                GameObject wallObject = new GameObject("WallEditController");
+                wallEdit = wallObject.AddComponent<WallEditController>();
+            }
+
+            SetReference(wallEdit, "board", board);
+
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(boardSizePrefab, board.transform);
+            Require(instance != null, "Failed to instantiate BoardSizePanel.prefab.");
+            instance.name = "BoardSizePanel";
+            BoardSizePanelUI panel = instance.GetComponent<BoardSizePanelUI>();
+            Require(panel != null, "BoardSizePanel.prefab is missing the BoardSizePanelUI component.");
+            SetReference(panel, "boardController", board);
+            SetReference(panel, "wallEditController", wallEdit);
+
+            // 5. 新控制条就绪后再移除旧版实例。
+            foreach (BoardSizePanelUI oldPanel in FindSceneComponents<BoardSizePanelUI>(scene))
+            {
+                if (!ReferenceEquals(oldPanel, panel))
+                {
+                    UnityEngine.Object.DestroyImmediate(oldPanel.gameObject);
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!EditorSceneManager.SaveScene(scene))
+            {
+                throw new InvalidOperationException($"Failed to save {ScenePath}.");
+            }
+
+            Debug.Log("Board panel layout rebuilt: removed texts, board size panel moved to the top.");
+        }
+
+        private static void DestroySceneObjectsByName(Scene scene, string objectName)
+        {
+            foreach (GameObject rootObject in scene.GetRootGameObjects())
+            {
+                DestroyChildByName(rootObject.transform, objectName);
+            }
+        }
+
+        private static void DestroyChildByName(Transform parent, string childName)
+        {
+            for (int index = parent.childCount - 1; index >= 0; index--)
+            {
+                Transform child = parent.GetChild(index);
+                DestroyChildByName(child, childName);
+                if (child.name == childName)
+                {
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
+                }
+            }
         }
 
         [MenuItem("Tools/Murdoku/Focus Character Panel Game View %#g")]
@@ -572,6 +687,155 @@ namespace Murdoku.Characters.Editor
             return saved;
         }
 
+        private static BoardSizePanelUI CreateBoardSizePanelPrefab()
+        {
+            RectTransform root = CreateRect("BoardSizePanel", null);
+            Stretch(root, new Vector2(0f, 1f), Vector2.one, new Vector2(20f, -84f), new Vector2(-20f, -20f));
+
+            Image background = AddImage("Background", root, new Color(0.15f, 0.18f, 0.26f, 0.92f));
+            Stretch(background.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            RectTransform row = CreateRect("Row", root);
+            Stretch(row, Vector2.zero, Vector2.one, new Vector2(14f, 6f), new Vector2(-14f, -6f));
+            HorizontalLayoutGroup layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(4, 4, 0, 0);
+            layout.spacing = 10f;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            TextMeshProUGUI label = AddText(
+                "Label",
+                row,
+                "棋盘大小",
+                20f,
+                new Color(0.90f, 0.93f, 0.98f, 1f),
+                TextAlignmentOptions.MidlineLeft);
+            label.fontStyle = FontStyles.Bold;
+            LayoutElement labelLayout = label.gameObject.AddComponent<LayoutElement>();
+            labelLayout.preferredWidth = 88f;
+            labelLayout.preferredHeight = 36f;
+
+            Image inputBackground = AddImage("SizeInput", row, new Color(0.92f, 0.94f, 0.97f, 1f));
+            LayoutElement inputLayout = inputBackground.gameObject.AddComponent<LayoutElement>();
+            inputLayout.preferredWidth = 108f;
+            inputLayout.preferredHeight = 36f;
+
+            TMP_Text placeholder = AddText(
+                "Placeholder",
+                inputBackground.rectTransform,
+                $"{TestBoardController.MinSize}~{TestBoardController.MaxSize}",
+                18f,
+                new Color(0.45f, 0.50f, 0.58f, 1f),
+                TextAlignmentOptions.Center);
+            Stretch(placeholder.rectTransform, Vector2.zero, Vector2.one, new Vector2(4f, 2f), new Vector2(-4f, -2f));
+            placeholder.raycastTarget = true;
+
+            RectTransform textRect = CreateRect("Text", inputBackground.rectTransform);
+            Stretch(textRect, Vector2.zero, Vector2.one, new Vector2(4f, 2f), new Vector2(-4f, -2f));
+            TextMeshProUGUI inputText = textRect.gameObject.AddComponent<TextMeshProUGUI>();
+            inputText.font = Font;
+            inputText.fontSize = 18f;
+            inputText.color = new Color(0.10f, 0.13f, 0.18f, 1f);
+            inputText.alignment = TextAlignmentOptions.Center;
+            inputText.raycastTarget = false;
+
+            TMP_InputField inputField = inputBackground.gameObject.AddComponent<TMP_InputField>();
+            inputField.textViewport = inputBackground.rectTransform;
+            inputField.textComponent = inputText;
+            inputField.placeholder = placeholder;
+            inputField.text = "6";
+            inputField.contentType = TMP_InputField.ContentType.IntegerNumber;
+            inputField.characterLimit = 2;
+            inputField.caretBlinkRate = 0.5f;
+
+            Image buttonBackground = AddImage("GenerateButton", row, new Color(0.22f, 0.48f, 0.86f, 1f));
+            LayoutElement buttonLayout = buttonBackground.gameObject.AddComponent<LayoutElement>();
+            buttonLayout.preferredWidth = 118f;
+            buttonLayout.preferredHeight = 36f;
+            Button generateButton = buttonBackground.gameObject.AddComponent<Button>();
+            generateButton.targetGraphic = buttonBackground;
+            generateButton.transition = Selectable.Transition.ColorTint;
+            ColorBlock buttonColors = generateButton.colors;
+            buttonColors.highlightedColor = new Color(0.31f, 0.57f, 0.95f, 1f);
+            buttonColors.pressedColor = new Color(0.15f, 0.34f, 0.62f, 1f);
+            generateButton.colors = buttonColors;
+
+            TextMeshProUGUI buttonText = AddText(
+                "Label",
+                buttonBackground.rectTransform,
+                "生成棋盘",
+                18f,
+                Color.white,
+                TextAlignmentOptions.Center);
+            Stretch(buttonText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            buttonText.fontStyle = FontStyles.Bold;
+            buttonText.raycastTarget = false;
+
+            Button placeModeButton = CreateModeButton(
+                row,
+                "PlaceModeButton",
+                "放置",
+                new Color(0.22f, 0.48f, 0.86f, 1f));
+            Button wallModeButton = CreateModeButton(
+                row,
+                "WallModeButton",
+                "墙壁",
+                new Color(0.35f, 0.38f, 0.45f, 1f));
+
+            TextMeshProUGUI hint = AddText(
+                "HintText",
+                row,
+                "输入边长后点击生成",
+                16f,
+                new Color(0.65f, 0.74f, 0.88f, 1f),
+                TextAlignmentOptions.MidlineLeft);
+            LayoutElement hintLayout = hint.gameObject.AddComponent<LayoutElement>();
+            hintLayout.flexibleWidth = 1f;
+            hintLayout.preferredHeight = 36f;
+
+            BoardSizePanelUI panel = root.gameObject.AddComponent<BoardSizePanelUI>();
+            SetReference(panel, "sizeInput", inputField);
+            SetReference(panel, "generateButton", generateButton);
+            SetReference(panel, "hintText", hint);
+            SetReference(panel, "placeModeButton", placeModeButton);
+            SetReference(panel, "wallModeButton", wallModeButton);
+
+            BoardSizePanelUI saved = SavePrefab(root.gameObject, $"{PrefabRoot}/BoardSizePanel.prefab")
+                .GetComponent<BoardSizePanelUI>();
+            return saved;
+        }
+
+        private static Button CreateModeButton(
+            Transform parent,
+            string objectName,
+            string labelText,
+            Color backgroundColor)
+        {
+            Image background = AddImage(objectName, parent, backgroundColor);
+            LayoutElement layout = background.gameObject.AddComponent<LayoutElement>();
+            layout.preferredWidth = 84f;
+            layout.preferredHeight = 36f;
+
+            Button button = background.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+            button.transition = Selectable.Transition.None;
+
+            TextMeshProUGUI label = AddText(
+                "Label",
+                background.rectTransform,
+                labelText,
+                16f,
+                Color.white,
+                TextAlignmentOptions.Center);
+            Stretch(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            label.fontStyle = FontStyles.Bold;
+            label.raycastTarget = false;
+            return button;
+        }
+
         private static GameObject CreateCharacterSystemPrefab(CharacterCardUI cardPrefab)
         {
             GameObject root = new GameObject("CharacterSystem");
@@ -652,27 +916,8 @@ namespace Murdoku.Characters.Editor
             Image boardPanel = AddImage("TestBoardPanel", canvasObject.GetComponent<RectTransform>(), new Color(0.11f, 0.14f, 0.20f, 0.96f));
             Stretch(boardPanel.rectTransform, Vector2.zero, Vector2.one, new Vector2(650f, 20f), new Vector2(-20f, -20f));
 
-            TextMeshProUGUI boardTitle = AddText(
-                "BoardTitle",
-                boardPanel.rectTransform,
-                "6×6 人物放置测试棋盘",
-                34f,
-                Color.white,
-                TextAlignmentOptions.Center);
-            Stretch(boardTitle.rectTransform, new Vector2(0f, 1f), Vector2.one, new Vector2(20f, -64f), new Vector2(-20f, -10f));
-            boardTitle.fontStyle = FontStyles.Bold;
-
-            TextMeshProUGUI statusText = AddText(
-                "PlacementStatusText",
-                boardPanel.rectTransform,
-                "点击人物后选择格子，或直接拖动人物卡到右侧格子。",
-                21f,
-                new Color(0.75f, 0.84f, 0.95f, 1f),
-                TextAlignmentOptions.Center);
-            Stretch(statusText.rectTransform, new Vector2(0f, 1f), Vector2.one, new Vector2(20f, -105f), new Vector2(-20f, -65f));
-
             RectTransform testGrid = CreateRect("TestGrid", boardPanel.rectTransform);
-            Place(testGrid, new Vector2(0.5f, 0.5f), new Vector2(712f, 712f), new Vector2(0f, -35f));
+            Place(testGrid, new Vector2(0.5f, 0.5f), new Vector2(880f, 880f), new Vector2(0f, -35f));
             GridLayoutGroup boardLayout = testGrid.gameObject.AddComponent<GridLayoutGroup>();
             boardLayout.cellSize = new Vector2(112f, 112f);
             boardLayout.spacing = new Vector2(8f, 8f);
@@ -688,6 +933,23 @@ namespace Murdoku.Characters.Editor
             SetReference(boardController, "gridRoot", testGrid);
             SetReference(boardController, "cellPrefab", cellPrefab);
 
+            GameObject wallObject = new GameObject("WallEditController");
+            WallEditController wallEditController = wallObject.AddComponent<WallEditController>();
+            SetReference(wallEditController, "board", boardController);
+
+            GameObject boardSizePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                $"{PrefabRoot}/BoardSizePanel.prefab");
+            Require(boardSizePrefab != null, "Failed to load BoardSizePanel.prefab.");
+            GameObject boardSizeInstance = (GameObject)PrefabUtility.InstantiatePrefab(
+                boardSizePrefab,
+                boardPanel.transform);
+            Require(boardSizeInstance != null, "Failed to instantiate BoardSizePanel.prefab.");
+            boardSizeInstance.name = "BoardSizePanel";
+            BoardSizePanelUI boardSizePanel = boardSizeInstance.GetComponent<BoardSizePanelUI>();
+            Require(boardSizePanel != null, "BoardSizePanel.prefab is missing the BoardSizePanelUI component.");
+            SetReference(boardSizePanel, "boardController", boardController);
+            SetReference(boardSizePanel, "wallEditController", wallEditController);
+
             GameObject systemInstance = (GameObject)PrefabUtility.InstantiatePrefab(systemPrefab);
             systemInstance.name = "CharacterSystem";
             CharacterPanelUI panelUI = systemInstance.GetComponentInChildren<CharacterPanelUI>(true);
@@ -700,7 +962,6 @@ namespace Murdoku.Characters.Editor
             CharacterPanelTestCoordinator coordinator = coordinatorObject.AddComponent<CharacterPanelTestCoordinator>();
             SetReference(coordinator, "testBoard", boardController);
             SetReference(coordinator, "placementController", placement);
-            SetReference(coordinator, "placementStatusText", statusText);
 
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -858,6 +1119,43 @@ namespace Murdoku.Characters.Editor
             return components[0];
         }
 
+        private static T FindChildByName<T>(Scene scene, string childName) where T : Component
+        {
+            foreach (GameObject rootObject in scene.GetRootGameObjects())
+            {
+                T match = FindChildByName<T>(rootObject.transform, childName);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static T FindChildByName<T>(Transform parent, string childName) where T : Component
+        {
+            foreach (Transform child in parent)
+            {
+                if (child.name == childName)
+                {
+                    T component = child.GetComponent<T>();
+                    if (component != null)
+                    {
+                        return component;
+                    }
+                }
+
+                T nested = FindChildByName<T>(child, childName);
+                if (nested != null)
+                {
+                    return nested;
+                }
+            }
+
+            return null;
+        }
+
         private static CharacterCardUI FindCard(IReadOnlyList<CharacterCardUI> cards, string displayName)
         {
             foreach (CharacterCardUI card in cards)
@@ -928,6 +1226,19 @@ namespace Murdoku.Characters.Editor
             }
 
             property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetFloat(UnityEngine.Object target, string propertyName, float value)
+        {
+            SerializedObject serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new InvalidOperationException($"Missing serialized property {target.GetType().Name}.{propertyName}.");
+            }
+
+            property.floatValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

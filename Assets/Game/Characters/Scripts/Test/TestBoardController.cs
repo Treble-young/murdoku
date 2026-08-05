@@ -7,20 +7,40 @@ namespace Murdoku.Characters
 {
     public sealed class TestBoardController : MonoBehaviour
     {
-        [Min(1)]
+        public const int MinSize = 5;
+        public const int MaxSize = 12;
+
+        [Min(MinSize)]
         [SerializeField] private int rows = 6;
-        [Min(1)]
+        [Min(MinSize)]
         [SerializeField] private int columns = 6;
         [SerializeField] private RectTransform gridRoot;
         [SerializeField] private TestBoardCellUI cellPrefab;
         [SerializeField] private List<Vector2Int> blockedPositions = new List<Vector2Int>();
+
+        [Header("自适应格子大小")]
+        [Min(24f)]
+        [SerializeField] private float maxCellSize = 128f;
+        [Min(0f)]
+        [SerializeField] private float cellSpacing = 8f;
+        [Min(24f)]
+        [SerializeField] private float minCellSize = 40f;
 
         private readonly List<TestBoardCellUI> cells = new List<TestBoardCellUI>();
 
         public event Action<ICharacterPlacementCell> CellClicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
+        /// <summary>棋盘重建完成后触发，参数为 (行数, 列数)。</summary>
+        public event Action<int, int> GridGenerated;
+
         public IReadOnlyList<TestBoardCellUI> Cells => cells;
+
+        public int Rows => rows;
+
+        public int Columns => columns;
+
+        public RectTransform GridRoot => gridRoot;
 
         private void Start()
         {
@@ -42,12 +62,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            GridLayoutGroup layout = gridRoot.GetComponent<GridLayoutGroup>();
-            if (layout != null)
-            {
-                layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                layout.constraintCount = columns;
-            }
+            ApplyLayoutForCurrentSize();
 
             HashSet<Vector2Int> blocked = new HashSet<Vector2Int>(blockedPositions);
             for (int row = 0; row < rows; row++)
@@ -63,6 +78,39 @@ namespace Murdoku.Characters
                     cells.Add(cell);
                 }
             }
+
+            GridGenerated?.Invoke(rows, columns);
+        }
+
+        /// <summary>
+        /// 运行时重新设置棋盘行列数并重建棋盘（尺寸会被限制在 MinSize~MaxSize）。
+        /// </summary>
+        public void SetGridSize(int newRows, int newColumns)
+        {
+            rows = Mathf.Clamp(newRows, MinSize, MaxSize);
+            columns = Mathf.Clamp(newColumns, MinSize, MaxSize);
+            GenerateGrid();
+        }
+
+        /// <summary>
+        /// 根据列数自动计算格子大小，保证棋盘始终适配 gridRoot 的固定区域。
+        /// </summary>
+        private void ApplyLayoutForCurrentSize()
+        {
+            GridLayoutGroup layout = gridRoot.GetComponent<GridLayoutGroup>();
+            if (layout == null)
+            {
+                return;
+            }
+
+            layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            layout.constraintCount = columns;
+
+            float spacing = Mathf.Max(0f, cellSpacing);
+            float availableWidth = Mathf.Max(1f, gridRoot.rect.width - spacing * (columns - 1));
+            float cellSize = Mathf.Clamp(availableWidth / columns, minCellSize, maxCellSize);
+            layout.cellSize = new Vector2(cellSize, cellSize);
+            layout.spacing = new Vector2(spacing, spacing);
         }
 
         private void ClearGrid()

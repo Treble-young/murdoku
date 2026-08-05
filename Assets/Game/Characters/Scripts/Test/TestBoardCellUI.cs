@@ -30,6 +30,10 @@ namespace Murdoku.Characters
         [SerializeField] private bool isPlaceable = true;
         [SerializeField] private CharacterData currentCharacter;
 
+        private Color? backgroundOverride;
+        private bool interactionEnabled = true;
+        private CanvasGroup interactionGroup;
+
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
@@ -61,7 +65,40 @@ namespace Murdoku.Characters
             gridPosition = position;
             isPlaceable = placeable;
             currentCharacter = null;
+            backgroundOverride = null;
             Refresh();
+        }
+
+        /// <summary>
+        /// 覆盖格子背景色（用于编辑器区域着色）；传 null 恢复默认棋盘格颜色。
+        /// </summary>
+        public void SetBackgroundOverride(Color? color)
+        {
+            backgroundOverride = color;
+            Refresh();
+        }
+
+        /// <summary>
+        /// 控制格子是否可交互（编辑器墙壁模式下应禁用点击与拖放）。
+        /// 注意：不能用 button.interactable 或 CanvasGroup.interactable（Unity 会叠加禁用色覆盖格子背景），
+        /// 只用 blocksRaycasts 让射线穿透格子，既能禁用交互又不改变格子颜色，且允许点击到达下方边界线。
+        /// </summary>
+        public void SetInteractionEnabled(bool enabled)
+        {
+            interactionEnabled = enabled;
+            if (interactionGroup == null)
+            {
+                interactionGroup = GetComponent<CanvasGroup>();
+                if (interactionGroup == null)
+                {
+                    interactionGroup = gameObject.AddComponent<CanvasGroup>();
+                }
+            }
+
+            // interactable 保持 true：Selectable.IsInteractable() 会检查 CanvasGroup，
+            // 一旦为 false，按钮 ColorTint 会用禁用色覆盖格子背景（表现为整格变深灰）。
+            interactionGroup.interactable = true;
+            interactionGroup.blocksRaycasts = enabled;
         }
 
         public bool TryPlaceCharacter(CharacterData character)
@@ -84,7 +121,7 @@ namespace Murdoku.Characters
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            if (currentCharacter != null)
+            if (interactionEnabled && currentCharacter != null)
             {
                 CharacterDragPreview.Show(currentCharacter, this, eventData);
             }
@@ -92,7 +129,7 @@ namespace Murdoku.Characters
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (currentCharacter != null)
+            if (interactionEnabled && currentCharacter != null)
             {
                 CharacterDragPreview.Move(eventData);
             }
@@ -105,7 +142,7 @@ namespace Murdoku.Characters
 
         public void OnDrop(PointerEventData eventData)
         {
-            if (eventData.pointerDrag == null)
+            if (!interactionEnabled || eventData.pointerDrag == null)
             {
                 return;
             }
@@ -131,10 +168,17 @@ namespace Murdoku.Characters
 
             if (backgroundImage != null)
             {
-                bool isOffset = (gridPosition.x + gridPosition.y) % 2 != 0;
-                backgroundImage.color = isPlaceable
-                    ? (isOffset ? darkCellColor : lightCellColor)
-                    : blockedCellColor;
+                if (backgroundOverride.HasValue)
+                {
+                    backgroundImage.color = backgroundOverride.Value;
+                }
+                else
+                {
+                    bool isOffset = (gridPosition.x + gridPosition.y) % 2 != 0;
+                    backgroundImage.color = isPlaceable
+                        ? (isOffset ? darkCellColor : lightCellColor)
+                        : blockedCellColor;
+                }
             }
 
             if (coordinateText != null)
