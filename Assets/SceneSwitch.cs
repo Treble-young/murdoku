@@ -8,4 +8,10 @@ public class SceneSwitch : MonoBehaviour
     {
         SceneManager.LoadScene("CharacterPanelTest");
     }
+
+    // 返回主菜单（SampleScene 的菜单面板）
+    public void BackToMenu()
+    {
+        SceneManager.LoadScene("SampleScene");
+    }
 }
