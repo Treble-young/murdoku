@@ -53,9 +53,35 @@ namespace Murdoku.PuzzleEditor
         private int currentSize;
         private RectTransform overlayRoot;
 
+        private bool[] pendingHorizontalWalls;
+        private bool[] pendingVerticalWalls;
+        private bool hasPendingWallState;
+
         public EditorMode Mode => mode;
 
+        public WallMap Walls => walls;
+
         public event System.Action<EditorMode> ModeChanged;
+
+        /// <summary>
+        /// 用存档中的墙数据重建棋盘墙体（水平墙/垂直墙均为行优先展平的一维数组）。
+        /// 墙状态会挂起，后续因布局重建触发的 RebuildWalls 会继续沿用，
+        /// 直到玩家手动编辑墙体或调用 ClearPendingWallState。
+        /// </summary>
+        public void ApplyWallState(int size, bool[] horizontalWalls, bool[] verticalWalls)
+        {
+            pendingHorizontalWalls = horizontalWalls;
+            pendingVerticalWalls = verticalWalls;
+            hasPendingWallState = true;
+            RebuildWalls(size, size);
+        }
+
+        public void ClearPendingWallState()
+        {
+            pendingHorizontalWalls = null;
+            pendingVerticalWalls = null;
+            hasPendingWallState = false;
+        }
 
         private struct BorderButton
         {
@@ -159,8 +185,63 @@ namespace Murdoku.PuzzleEditor
             ClearBorders();
             currentSize = rows;
             walls = new WallMap(rows);
+            bool appliedPending = hasPendingWallState;
+            if (appliedPending)
+            {
+                ApplyPendingWallState();
+            }
+
             CreateBorders();
             ApplyMode();
+
+            if (appliedPending)
+            {
+                UpdateAllBorderVisuals();
+                RecolorRegions();
+            }
+        }
+
+        private void ApplyPendingWallState()
+        {
+            if (walls == null)
+            {
+                return;
+            }
+
+            int size = walls.Size;
+            if (pendingHorizontalWalls != null)
+            {
+                int index = 0;
+                for (int row = 0; row < size - 1; row++)
+                {
+                    for (int col = 0; col < size; col++)
+                    {
+                        if (index < pendingHorizontalWalls.Length)
+                        {
+                            walls.SetHorizontalWall(row, col, pendingHorizontalWalls[index]);
+                        }
+
+                        index++;
+                    }
+                }
+            }
+
+            if (pendingVerticalWalls != null)
+            {
+                int index = 0;
+                for (int row = 0; row < size; row++)
+                {
+                    for (int col = 0; col < size - 1; col++)
+                    {
+                        if (index < pendingVerticalWalls.Length)
+                        {
+                            walls.SetVerticalWall(row, col, pendingVerticalWalls[index]);
+                        }
+
+                        index++;
+                    }
+                }
+            }
         }
 
         private void ClearBorders()
@@ -362,6 +443,8 @@ namespace Murdoku.PuzzleEditor
             {
                 return;
             }
+
+            ClearPendingWallState();
 
             BorderButton border = borders[borderIndex];
             if (border.IsHorizontal)

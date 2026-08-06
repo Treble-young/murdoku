@@ -17,6 +17,8 @@ namespace Murdoku.Characters
 
         public CharacterData SelectedCharacter => selectedCard == null ? null : selectedCard.Character;
 
+        public IReadOnlyList<CharacterData> Characters => characters;
+
         private void Start()
         {
             Rebuild();
