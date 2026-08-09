@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Murdoku.Audio;
 using Murdoku.PuzzleEditor;
 using TMPro;
 using UnityEngine;
@@ -82,6 +83,15 @@ namespace Murdoku.Characters
             CharacterPlacementResult result)
         {
             string characterName = character == null ? "人物" : character.DisplayName;
+
+            if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
+            {
+                SfxPlayer.Play(SfxCue.TilePlace);
+            }
+            else
+            {
+                SfxPlayer.Play(SfxCue.WrongMove);
+            }
 
             switch (result)
             {

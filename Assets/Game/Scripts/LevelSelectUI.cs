@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Murdoku.Audio;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -27,6 +28,7 @@ namespace Murdoku
 
             if (backButton != null)
             {
+                UiSfxFeedback.Ensure(backButton);
                 backButton.onClick.AddListener(BackToMenu);
             }
         }
@@ -82,6 +84,7 @@ namespace Murdoku
                 Button button = item.GetComponentInChildren<Button>();
                 if (button != null)
                 {
+                    UiSfxFeedback.Ensure(button);
                     PuzzleData captured = puzzle;
                     button.onClick.AddListener(() => EnterPuzzle(captured));
                 }

@@ -1,3 +1,4 @@
+using Murdoku.Audio;
 using Murdoku.PuzzleEditor;
 using TMPro;
 using UnityEngine;
@@ -35,16 +36,19 @@ namespace Murdoku.Characters
         {
             if (generateButton != null)
             {
+                UiSfxFeedback.Ensure(generateButton);
                 generateButton.onClick.AddListener(HandleGenerateClicked);
             }
 
             if (placeModeButton != null)
             {
+                UiSfxFeedback.Ensure(placeModeButton);
                 placeModeButton.onClick.AddListener(HandlePlaceModeClicked);
             }
 
             if (wallModeButton != null)
             {
+                UiSfxFeedback.Ensure(wallModeButton);
                 wallModeButton.onClick.AddListener(HandleWallModeClicked);
             }
 

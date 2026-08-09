@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Murdoku.Audio;
 using Murdoku.Characters;
 using UnityEngine;
 using UnityEngine.UI;
@@ -445,6 +446,7 @@ namespace Murdoku.PuzzleEditor
             }
 
             ClearPendingWallState();
+            SfxPlayer.Play(SfxCue.UiClick);
 
             BorderButton border = borders[borderIndex];
             if (border.IsHorizontal)
@@ -469,6 +471,7 @@ namespace Murdoku.PuzzleEditor
 
             if (isHover)
             {
+                SfxPlayer.Play(SfxCue.UiHover);
                 hoveredBorders.Add(borderIndex);
             }
             else
