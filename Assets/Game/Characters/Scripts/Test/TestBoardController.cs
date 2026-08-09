@@ -8,7 +8,7 @@ namespace Murdoku.Characters
     public sealed class TestBoardController : MonoBehaviour
     {
         public const int MinSize = 5;
-        public const int MaxSize = 12;
+        public const int MaxSize = 10;
 
         [Min(MinSize)]
         [SerializeField] private int rows = 6;
