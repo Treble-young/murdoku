@@ -12,6 +12,7 @@ namespace Murdoku.Characters
 
         private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
         private CharacterCardUI selectedCard;
+        private TestBoardController board;
 
         public event Action<CharacterData> SelectionChanged;
 
@@ -21,6 +22,42 @@ namespace Murdoku.Characters
 
         private void Start()
         {
+            board = UnityEngine.Object.FindFirstObjectByType<TestBoardController>();
+            if (board != null)
+            {
+                board.GridGenerated += HandleGridGenerated;
+            }
+
+            // 根据当前棋盘大小立即重建嫌疑人列表（覆盖默认测试角色）。
+            if (board != null)
+            {
+                RebuildSuspects(board.Rows);
+            }
+            else
+            {
+                Rebuild();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (board != null)
+            {
+                board.GridGenerated -= HandleGridGenerated;
+            }
+        }
+
+        private void HandleGridGenerated(int rows, int columns)
+        {
+            RebuildSuspects(rows);
+        }
+
+        /// <summary>
+        /// 根据棋盘大小重建嫌疑人列表：N-1 名嫌疑人（A~）+ 1 名受害者（V）。
+        /// </summary>
+        public void RebuildSuspects(int boardSize)
+        {
+            SetCharacters(SuspectGenerator.Generate(boardSize));
             Rebuild();
         }
 

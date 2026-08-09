@@ -431,8 +431,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u518D\u6B21\u70B9\u51FB\u53EF\u53D6\u6D88\u9009\u62E9\uFF0C\u4E5F\u53EF\u62D6\u52A8\u4EBA\u7269\u5361\u5230\u53F3\u4FA7\u683C\u5B50"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: eb8bacd46357fb4418b3d529965e7b08, type: 2}
-  m_sharedMaterial: {fileID: 2979193228837331801, guid: eb8bacd46357fb4418b3d529965e7b08, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: ef6913b45a70806458f6e0128eef9e02, type: 2}
+  m_sharedMaterial: {fileID: 2979193228837331801, guid: ef6913b45a70806458f6e0128eef9e02, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -718,10 +718,10 @@ MonoBehaviour:
   m_ChildAlignment: 1
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 170, y: 320}
+  m_CellSize: {x: 160, y: 290}
   m_Spacing: {x: 4, y: 10}
   m_Constraint: 1
-  m_ConstraintCount: 3
+  m_ConstraintCount: 5
 --- !u!114 &9144601441432432866
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -803,8 +803,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5ACC\u7591\u4EBA"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: eb8bacd46357fb4418b3d529965e7b08, type: 2}
-  m_sharedMaterial: {fileID: 2979193228837331801, guid: eb8bacd46357fb4418b3d529965e7b08, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: ef6913b45a70806458f6e0128eef9e02, type: 2}
+  m_sharedMaterial: {fileID: 2979193228837331801, guid: ef6913b45a70806458f6e0128eef9e02, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

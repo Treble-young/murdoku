@@ -28,6 +28,26 @@ namespace Murdoku.Characters
         public Sprite Portrait => portrait;
         public Color PlaceholderColor => placeholderColor;
 
+        /// <summary>
+        /// 运行时创建嫌疑人/受害者数据（不保存为 asset，用于出题器按棋盘大小动态生成）。
+        /// </summary>
+        public static CharacterData CreateRuntime(
+            string characterId,
+            string displayName,
+            CharacterGender gender,
+            string clue,
+            Color placeholderColor)
+        {
+            CharacterData data = CreateInstance<CharacterData>();
+            data.characterId = characterId;
+            data.displayName = displayName;
+            data.gender = gender;
+            data.clue = clue;
+            data.portrait = null;
+            data.placeholderColor = placeholderColor;
+            return data;
+        }
+
         public string Initial
         {
             get
@@ -53,6 +73,14 @@ namespace Murdoku.Characters
                         return "?";
                 }
             }
+        }
+
+        /// <summary>
+        /// 在男性/女性之间循环切换（嫌疑人编辑用）。
+        /// </summary>
+        public void ToggleGender()
+        {
+            gender = gender == CharacterGender.Female ? CharacterGender.Male : CharacterGender.Female;
         }
     }
 }

@@ -157,9 +157,9 @@ namespace Murdoku.Characters.Editor
             Require(boardSerialized.FindProperty("cellPrefab").objectReferenceValue != null, "TestBoardController.CellPrefab is not assigned.");
             RectTransform testGridRect = boardSerialized.FindProperty("gridRoot").objectReferenceValue as RectTransform;
             Require(
-                testGridRect != null && Mathf.Approximately(testGridRect.sizeDelta.x, 880f) &&
-                Mathf.Approximately(testGridRect.sizeDelta.y, 880f),
-                "TestGrid sizeDelta must be 880×880.");
+                testGridRect != null && Mathf.Approximately(testGridRect.sizeDelta.x, 850f) &&
+                Mathf.Approximately(testGridRect.sizeDelta.y, 850f),
+                "TestGrid sizeDelta must be 850×850.");
 
             BoardSizePanelUI boardSizePanel = FindSingleSceneComponent<BoardSizePanelUI>(scene);
             SerializedObject sizeSerialized = new SerializedObject(boardSizePanel);
@@ -279,10 +279,10 @@ namespace Murdoku.Characters.Editor
             DestroySceneObjectsByName(scene, "BoardTitle");
             DestroySceneObjectsByName(scene, "PlacementStatusText");
 
-            // 2. 放大棋盘区域：从 712×712 调整到 880×880，让大尺寸棋盘的格子更大。
+            // 2. 调整棋盘区域为 850×850：在不遮挡底部保存面板的前提下尽可能大。
             RectTransform testGrid = FindChildByName<RectTransform>(scene, "TestGrid");
             Require(testGrid != null, "CharacterPanelTest is missing the TestGrid.");
-            testGrid.sizeDelta = new Vector2(880f, 880f);
+            testGrid.sizeDelta = new Vector2(850f, 850f);
 
             // 3. 优先复用现有 prefab（避免运行时强制重写资源被锁），缺失时才生成。
             GameObject boardSizePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
@@ -917,7 +917,7 @@ namespace Murdoku.Characters.Editor
             Stretch(boardPanel.rectTransform, Vector2.zero, Vector2.one, new Vector2(650f, 20f), new Vector2(-20f, -20f));
 
             RectTransform testGrid = CreateRect("TestGrid", boardPanel.rectTransform);
-            Place(testGrid, new Vector2(0.5f, 0.5f), new Vector2(880f, 880f), new Vector2(0f, -35f));
+            Place(testGrid, new Vector2(0.5f, 0.5f), new Vector2(850f, 850f), new Vector2(0f, -35f));
             GridLayoutGroup boardLayout = testGrid.gameObject.AddComponent<GridLayoutGroup>();
             boardLayout.cellSize = new Vector2(112f, 112f);
             boardLayout.spacing = new Vector2(8f, 8f);

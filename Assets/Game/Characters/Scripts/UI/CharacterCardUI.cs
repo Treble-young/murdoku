@@ -28,10 +28,16 @@ namespace Murdoku.Characters
         [Min(0f)]
         [SerializeField] private float animationDuration = 0.15f;
 
+        private static readonly Color MaleColor = new Color(0.22f, 0.48f, 0.92f, 1f);
+        private static readonly Color FemaleColor = new Color(0.92f, 0.28f, 0.30f, 1f);
+
         private CharacterData character;
         private Action<CharacterCardUI> clicked;
         private Action<CharacterCardUI> dragStarted;
         private Coroutine scaleRoutine;
+        private RectTransform genderCircleRect;
+        private TMP_Text genderSymbolText;
+        private readonly Vector3[] genderCorners = new Vector3[4];
 
         public CharacterData Character => character;
 
@@ -41,6 +47,8 @@ namespace Murdoku.Characters
             {
                 button.onClick.AddListener(HandleButtonClicked);
             }
+
+            SetupGenderToggle();
         }
 
         private void OnDestroy()
@@ -49,6 +57,145 @@ namespace Murdoku.Characters
             {
                 button.onClick.RemoveListener(HandleButtonClicked);
             }
+        }
+
+        /// <summary>
+        /// 性别图标变为可点击的圆形按钮：点击在男/女之间切换。
+        /// 圆形按钮直接挂在卡片根的最上层（SetAsLastSibling），不会被卡片内部任何元素遮挡；
+        /// 性别符号作为圆形的子文本（渲染在圆形之上，不会被白底挡住）；
+        /// 位置在 LateUpdate 里每帧跟随原性别图标的矩形中心（原图标隐藏、仅作位置参照）。
+        /// 使用 IPointerClickHandler（GenderToggleZone）接收点击。
+        /// </summary>
+        private void SetupGenderToggle()
+        {
+            if (genderText == null)
+            {
+                Debug.LogWarning("[Gender] SetupGenderToggle: genderText 为空，跳过。", this);
+                return;
+            }
+
+            // 原性别图标：隐藏（保留 RectTransform 作为圆形按钮的位置参照），不拦截射线。
+            genderText.raycastTarget = false;
+            Color hidden = genderText.color;
+            hidden.a = 0f;
+            genderText.color = hidden;
+
+            GameObject circleObject = new GameObject(
+                "GenderCircle",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            circleObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform circleRect = circleObject.GetComponent<RectTransform>();
+            circleRect.SetParent(transform, false);
+            circleRect.SetAsLastSibling();
+
+            circleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            circleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            circleRect.pivot = new Vector2(0.5f, 0.5f);
+            circleRect.sizeDelta = new Vector2(50f, 50f);
+
+            Image circle = circleObject.GetComponent<Image>();
+            circle.sprite = CreateCircleSprite(64);
+            circle.color = Color.white;
+            circle.raycastTarget = true;
+
+            GenderToggleZone zone = circleObject.AddComponent<GenderToggleZone>();
+            zone.OnClicked = HandleGenderClicked;
+
+            // 性别符号：圆形的子文本（铺满圆形、居中），渲染在白色圆形之上。
+            GameObject symbolObject = new GameObject(
+                "Symbol",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            symbolObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform symbolRect = symbolObject.GetComponent<RectTransform>();
+            symbolRect.SetParent(circleRect, false);
+            symbolRect.anchorMin = Vector2.zero;
+            symbolRect.anchorMax = Vector2.one;
+            symbolRect.offsetMin = Vector2.zero;
+            symbolRect.offsetMax = Vector2.zero;
+
+            genderSymbolText = symbolObject.GetComponent<TextMeshProUGUI>();
+            genderSymbolText.font = genderText.font;
+            genderSymbolText.fontSize = 32f;
+            genderSymbolText.fontStyle = FontStyles.Bold;
+            genderSymbolText.alignment = TextAlignmentOptions.Center;
+            genderSymbolText.raycastTarget = false;
+
+            genderCircleRect = circleRect;
+
+            UpdateGenderVisual();
+            Debug.Log(
+                $"[Gender] 圆形按钮已创建：挂={transform.name}, size={circleRect.sizeDelta}",
+                this);
+        }
+
+        /// <summary>
+        /// 每帧把圆形按钮对齐到性别图标的实际矩形中心（用 GetWorldCorners 计算，不受 pivot 影响；
+        /// 卡片缩放/布局变化时依然精确贴合）。
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (genderCircleRect == null || genderText == null)
+            {
+                return;
+            }
+
+            genderText.rectTransform.GetWorldCorners(genderCorners);
+            genderCircleRect.position = (genderCorners[0] + genderCorners[2]) * 0.5f;
+        }
+
+        private void HandleGenderClicked()
+        {
+            Debug.Log($"[Gender] 点击触发：character={(character == null ? "null" : character.CharacterId)}", this);
+            if (character == null)
+            {
+                return;
+            }
+
+            character.ToggleGender();
+            UpdateGenderVisual();
+        }
+
+        /// <summary>
+        /// 刷新性别符号的内容与颜色（♂蓝 / ♀红），显示在圆形按钮的子文本上。
+        /// </summary>
+        private void UpdateGenderVisual()
+        {
+            if (genderSymbolText == null)
+            {
+                return;
+            }
+
+            if (character == null)
+            {
+                genderSymbolText.text = string.Empty;
+                return;
+            }
+
+            genderSymbolText.text = character.GenderSymbol;
+            genderSymbolText.color = character.Gender == CharacterGender.Female ? FemaleColor : MaleColor;
+        }
+
+        private static Sprite CreateCircleSprite(int size)
+        {
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float radius = size / 2f - 1f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - size / 2f + 0.5f;
+                    float dy = y - size / 2f + 0.5f;
+                    texture.SetPixel(x, y, dx * dx + dy * dy <= radius * radius ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            texture.name = "GenderCircle";
+            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
         }
 
         public void Bind(
@@ -86,7 +233,7 @@ namespace Murdoku.Characters
 
             if (genderText != null)
             {
-                genderText.text = data.GenderSymbol;
+                UpdateGenderVisual();
             }
 
             if (nameText != null)
@@ -173,6 +320,7 @@ namespace Murdoku.Characters
         {
             if (character != null)
             {
+                Debug.Log($"[Card] 卡片按钮点击：{character.CharacterId}", this);
                 clicked?.Invoke(this);
             }
         }

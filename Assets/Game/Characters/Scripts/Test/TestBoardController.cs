@@ -44,6 +44,14 @@ namespace Murdoku.Characters
 
         private void Start()
         {
+            // Canvas 第一帧布局未完成时 gridRoot.rect 为 0，会导致格子被缩到最小值。
+            // 延迟一帧等布局完成后再生成棋盘，保证 rect 有效。
+            StartCoroutine(GenerateAfterLayout());
+        }
+
+        private System.Collections.IEnumerator GenerateAfterLayout()
+        {
+            yield return null;
             GenerateGrid();
         }
 
