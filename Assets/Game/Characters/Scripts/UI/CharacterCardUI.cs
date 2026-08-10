@@ -72,7 +72,6 @@ namespace Murdoku.Characters
         {
             if (genderText == null)
             {
-                Debug.LogWarning("[Gender] SetupGenderToggle: genderText 为空，跳过。", this);
                 return;
             }
 
@@ -129,9 +128,6 @@ namespace Murdoku.Characters
             genderCircleRect = circleRect;
 
             UpdateGenderVisual();
-            Debug.Log(
-                $"[Gender] 圆形按钮已创建：挂={transform.name}, size={circleRect.sizeDelta}",
-                this);
         }
 
         /// <summary>
@@ -151,7 +147,6 @@ namespace Murdoku.Characters
 
         private void HandleGenderClicked()
         {
-            Debug.Log($"[Gender] 点击触发：character={(character == null ? "null" : character.CharacterId)}", this);
             if (character == null)
             {
                 return;
@@ -323,7 +318,6 @@ namespace Murdoku.Characters
         {
             if (character != null)
             {
-                Debug.Log($"[Card] 卡片按钮点击：{character.CharacterId}", this);
                 clicked?.Invoke(this);
             }
         }
