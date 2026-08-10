@@ -42,6 +42,52 @@ namespace Murdoku.Characters
 
         public RectTransform GridRoot => gridRoot;
 
+        /// <summary>
+        /// 根据当前放置结果刷新整张棋盘的行/列占用高亮。
+        /// </summary>
+        public void RefreshRowColumnHighlights()
+        {
+            HashSet<int> occupiedRows = new HashSet<int>();
+            HashSet<int> occupiedColumns = new HashSet<int>();
+
+            foreach (TestBoardCellUI cell in cells)
+            {
+                if (cell == null || !cell.IsOccupied)
+                {
+                    continue;
+                }
+
+                occupiedRows.Add(cell.GridPosition.y);
+                occupiedColumns.Add(cell.GridPosition.x);
+            }
+
+            foreach (TestBoardCellUI cell in cells)
+            {
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                bool highlighted = occupiedRows.Contains(cell.GridPosition.y) ||
+                                   occupiedColumns.Contains(cell.GridPosition.x);
+                cell.SetRowColumnHighlight(highlighted);
+            }
+        }
+
+        /// <summary>
+        /// 清除提交失败时标记的红色错误格（行/列高亮由 RefreshRowColumnHighlights 统一刷新）。
+        /// </summary>
+        public void ClearErrorHighlights()
+        {
+            foreach (TestBoardCellUI cell in cells)
+            {
+                if (cell != null)
+                {
+                    cell.SetErrorHighlight(false);
+                }
+            }
+        }
+
         private void Start()
         {
             // Canvas 第一帧布局未完成时 gridRoot.rect 为 0，会导致格子被缩到最小值。

@@ -20,6 +20,52 @@ namespace Murdoku.Characters
 
         public IReadOnlyList<CharacterData> Characters => characters;
 
+        /// <summary>
+        /// 把存档中的角色线索写回运行时角色数据，并刷新所有卡片的线索文本。
+        /// </summary>
+        public void ApplyClues(IEnumerable<PuzzleClueData> clues)
+        {
+            if (clues == null)
+            {
+                return;
+            }
+
+            foreach (PuzzleClueData clue in clues)
+            {
+                if (clue == null || string.IsNullOrEmpty(clue.characterId))
+                {
+                    continue;
+                }
+
+                foreach (CharacterData character in characters)
+                {
+                    if (character == null)
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(character.CharacterId, clue.characterId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        character.SetClue(clue.clue);
+                        break;
+                    }
+                }
+            }
+
+            RefreshAllClues();
+        }
+
+        public void RefreshAllClues()
+        {
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null)
+                {
+                    card.RefreshClue();
+                }
+            }
+        }
+
         private void Start()
         {
             board = UnityEngine.Object.FindFirstObjectByType<TestBoardController>();

@@ -15,6 +15,13 @@ namespace Murdoku
     }
 
     [Serializable]
+    public sealed class PuzzleClueData
+    {
+        public string characterId;
+        public string clue;
+    }
+
+    [Serializable]
     public sealed class PuzzleData
     {
         public string id;
@@ -28,5 +35,6 @@ namespace Murdoku
         public bool[] verticalWalls;
 
         public List<PuzzlePlacementData> placements = new List<PuzzlePlacementData>();
+        public List<PuzzleClueData> clues = new List<PuzzleClueData>();
     }
 }

@@ -30,9 +30,14 @@ namespace Murdoku.Characters
         [SerializeField] private bool isPlaceable = true;
         [SerializeField] private CharacterData currentCharacter;
 
+        private static readonly Color RowColumnHighlightColor = new Color(0.30f, 0.55f, 0.95f, 0.30f);
+        private static readonly Color ErrorHighlightColor = new Color(0.92f, 0.22f, 0.22f, 0.45f);
+
         private Color? backgroundOverride;
         private bool interactionEnabled = true;
         private CanvasGroup interactionGroup;
+        private Image rowColumnHighlight;
+        private Image errorHighlight;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
@@ -99,6 +104,73 @@ namespace Murdoku.Characters
             // 一旦为 false，按钮 ColorTint 会用禁用色覆盖格子背景（表现为整格变深灰）。
             interactionGroup.interactable = true;
             interactionGroup.blocksRaycasts = enabled;
+        }
+
+        /// <summary>
+        /// 行/列占用提示：所在行或列已被放置角色时显示淡蓝色覆盖层。
+        /// </summary>
+        public void SetRowColumnHighlight(bool on)
+        {
+            Image image = EnsureHighlight(ref rowColumnHighlight, RowColumnHighlightColor);
+            if (image == null)
+            {
+                return;
+            }
+
+            image.gameObject.SetActive(on);
+            if (on)
+            {
+                image.color = RowColumnHighlightColor;
+            }
+        }
+
+        /// <summary>
+        /// 错误提示（提交失败时标红相关格子）。
+        /// </summary>
+        public void SetErrorHighlight(bool on)
+        {
+            Image image = EnsureHighlight(ref errorHighlight, ErrorHighlightColor);
+            if (image == null)
+            {
+                return;
+            }
+
+            image.gameObject.SetActive(on);
+            if (on)
+            {
+                image.color = ErrorHighlightColor;
+            }
+        }
+
+        private Image EnsureHighlight(ref Image field, Color color)
+        {
+            if (field != null)
+            {
+                return field;
+            }
+
+            GameObject overlay = new GameObject(
+                "HighlightOverlay",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            overlay.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = overlay.GetComponent<RectTransform>();
+            rect.SetParent(transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            // 插到背景（index 0）之上、棋子之下，避免盖住角色。
+            rect.SetSiblingIndex(1);
+
+            Image image = overlay.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            overlay.SetActive(false);
+            field = image;
+            return image;
         }
 
         public bool TryPlaceCharacter(CharacterData character)

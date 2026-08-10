@@ -247,12 +247,16 @@ namespace Murdoku.Characters.Editor
                 placement.HandleCharacterDropped(minaCard.Character, board.Cells[1]) == CharacterPlacementResult.CellOccupied,
                 "Dragging Mina must not allow it to occupy Leo's cell.");
             Require(
-                placement.HandleCharacterDropped(minaCard.Character, board.Cells[2]) == CharacterPlacementResult.Placed,
-                "Dragging Mina must place it in a different empty cell.");
+                placement.HandleCharacterDropped(minaCard.Character, board.Cells[2]) == CharacterPlacementResult.RowColumnConflict,
+                "Dragging Mina must be rejected when its row is already occupied.");
+            Require(
+                placement.HandleCharacterDropped(minaCard.Character, board.Cells[6]) == CharacterPlacementResult.Placed,
+                "Dragging Mina must place it in a free row and column.");
             Require(board.Cells[1].CurrentCharacter.DisplayName == "Leo", "Leo must remain in place after a rejected placement.");
-            Require(board.Cells[2].CurrentCharacter.DisplayName == "Mina", "Mina must occupy the new cell.");
+            Require(!board.Cells[2].IsOccupied, "A rejected placement must leave the target cell empty.");
+            Require(board.Cells[6].CurrentCharacter.DisplayName == "Mina", "Mina must occupy the new cell.");
 
-            Debug.Log("CharacterPanelTest validation passed: hierarchy, selection toggle, drag placement, movement, and occupancy checks succeeded.");
+            Debug.Log("CharacterPanelTest validation passed: hierarchy, selection toggle, drag placement, movement, occupancy, and row/column rule checks succeeded.");
         }
 
         [MenuItem("Tools/Murdoku/Open Character Panel Test and Play")]

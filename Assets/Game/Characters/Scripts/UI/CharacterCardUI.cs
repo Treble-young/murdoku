@@ -42,6 +42,17 @@ namespace Murdoku.Characters
 
         public CharacterData Character => character;
 
+        /// <summary>
+        /// 重新把角色当前线索同步到卡片线索文本（编辑线索后调用）。
+        /// </summary>
+        public void RefreshClue()
+        {
+            if (clueText != null)
+            {
+                clueText.text = character == null ? string.Empty : character.Clue;
+            }
+        }
+
         private void Awake()
         {
             if (button != null)

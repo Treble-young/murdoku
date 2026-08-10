@@ -12,6 +12,7 @@ namespace Murdoku.Characters
         CellOccupied,
         AlreadyInCell,
         RejectedByCell,
+        RowColumnConflict,
         Placed,
         Moved
     }
@@ -93,6 +94,11 @@ namespace Murdoku.Characters
                 return CharacterPlacementResult.CellOccupied;
             }
 
+            if (HasRowOrColumnConflict(character, cell))
+            {
+                return CharacterPlacementResult.RowColumnConflict;
+            }
+
             if (!cell.TryPlaceCharacter(character))
             {
                 return CharacterPlacementResult.RejectedByCell;
@@ -106,6 +112,104 @@ namespace Murdoku.Characters
 
             placements[character] = cell;
             return moved ? CharacterPlacementResult.Moved : CharacterPlacementResult.Placed;
+        }
+
+        /// <summary>
+        /// Murdoku 核心规则：每行、每列最多站一个人。
+        /// 目标格所在行/列已被其他角色占用时拒绝放置（移动时跳过自身旧位置）。
+        /// </summary>
+        private bool HasRowOrColumnConflict(CharacterData character, ICharacterPlacementCell target)
+        {
+            foreach (KeyValuePair<CharacterData, ICharacterPlacementCell> pair in placements)
+            {
+                if (pair.Key == null || pair.Value == null)
+                {
+                    continue;
+                }
+
+                if (ReferenceEquals(pair.Key, character))
+                {
+                    continue;
+                }
+
+                if (pair.Value.GridPosition.x == target.GridPosition.x ||
+                    pair.Value.GridPosition.y == target.GridPosition.y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 统计指定角色中尚未放置到棋盘的人数。
+        /// </summary>
+        public int CountMissingCharacters(IReadOnlyList<CharacterData> characters)
+        {
+            if (characters == null)
+            {
+                return 0;
+            }
+
+            int missing = 0;
+            foreach (CharacterData character in characters)
+            {
+                if (character == null)
+                {
+                    continue;
+                }
+
+                if (!placements.TryGetValue(character, out ICharacterPlacementCell cell) || cell == null)
+                {
+                    missing++;
+                }
+            }
+
+            return missing;
+        }
+
+        /// <summary>
+        /// 是否存在两个角色占用同一行或同一列（用于提交时兜底校验旧存档）。
+        /// </summary>
+        public bool HasRowColumnConflict()
+        {
+            return GetRowColumnConflictCells().Count > 0;
+        }
+
+        /// <summary>
+        /// 返回所有参与同行/同列冲突的角色所在格子。
+        /// </summary>
+        public List<ICharacterPlacementCell> GetRowColumnConflictCells()
+        {
+            List<ICharacterPlacementCell> result = new List<ICharacterPlacementCell>();
+            List<ICharacterPlacementCell> cellsList = new List<ICharacterPlacementCell>(placements.Values);
+            for (int i = 0; i < cellsList.Count; i++)
+            {
+                for (int j = i + 1; j < cellsList.Count; j++)
+                {
+                    if (cellsList[i] == null || cellsList[j] == null)
+                    {
+                        continue;
+                    }
+
+                    if (cellsList[i].GridPosition.x == cellsList[j].GridPosition.x ||
+                        cellsList[i].GridPosition.y == cellsList[j].GridPosition.y)
+                    {
+                        if (!result.Contains(cellsList[i]))
+                        {
+                            result.Add(cellsList[i]);
+                        }
+
+                        if (!result.Contains(cellsList[j]))
+                        {
+                            result.Add(cellsList[j]);
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
 
         public bool TryGetPlacement(CharacterData character, out ICharacterPlacementCell cell)

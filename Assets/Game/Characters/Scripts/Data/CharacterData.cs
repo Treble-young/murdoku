@@ -28,6 +28,11 @@ namespace Murdoku.Characters
         public Sprite Portrait => portrait;
         public Color PlaceholderColor => placeholderColor;
 
+        public void SetClue(string text)
+        {
+            clue = text ?? string.Empty;
+        }
+
         /// <summary>
         /// 运行时创建嫌疑人/受害者数据（不保存为 asset，用于出题器按棋盘大小动态生成）。
         /// </summary>
