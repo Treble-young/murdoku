@@ -2,15 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
-using Murdoku.Audio;
 
 [RequireComponent(typeof(Button))]
 public class TextButtonHover : MonoBehaviour,
     IPointerEnterHandler,
     IPointerExitHandler,
     IPointerDownHandler,
-    IPointerUpHandler,
-    IPointerClickHandler
+    IPointerUpHandler
 {
     [Header("拖拽按钮内部的TMP文字")]
     public TMP_Text buttonText;
@@ -32,12 +30,8 @@ public class TextButtonHover : MonoBehaviour,
     //鼠标移入
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (_btn.interactable)
-        {
-            SfxPlayer.Play(SfxCue.UiHover);
-            if (buttonText != null)
-                buttonText.color = highlightColor;
-        }
+        if (_btn.interactable && buttonText != null)
+            buttonText.color = highlightColor;
     }
 
     //鼠标移出
@@ -59,11 +53,5 @@ public class TextButtonHover : MonoBehaviour,
     {
         if (_btn.interactable && buttonText != null)
             buttonText.color = highlightColor;
-    }
-
-    public void OnPointerClick(PointerEventData eventData)
-    {
-        if (_btn.interactable)
-            SfxPlayer.Play(SfxCue.UiClick);
     }
 }

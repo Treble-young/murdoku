@@ -36,19 +36,19 @@ namespace Murdoku.Characters
         {
             if (generateButton != null)
             {
-                UiSfxFeedback.Ensure(generateButton);
+                UiClickFeedback.Ensure(generateButton);
                 generateButton.onClick.AddListener(HandleGenerateClicked);
             }
 
             if (placeModeButton != null)
             {
-                UiSfxFeedback.Ensure(placeModeButton);
+                UiClickFeedback.Ensure(placeModeButton);
                 placeModeButton.onClick.AddListener(HandlePlaceModeClicked);
             }
 
             if (wallModeButton != null)
             {
-                UiSfxFeedback.Ensure(wallModeButton);
+                UiClickFeedback.Ensure(wallModeButton);
                 wallModeButton.onClick.AddListener(HandleWallModeClicked);
             }
 

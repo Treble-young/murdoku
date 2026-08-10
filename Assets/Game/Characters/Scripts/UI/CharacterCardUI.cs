@@ -8,8 +8,7 @@ using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
-    public sealed class CharacterCardUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
-        IPointerEnterHandler
+    public sealed class CharacterCardUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [Header("Interaction")]
         [SerializeField] private Button button;
@@ -48,6 +47,7 @@ namespace Murdoku.Characters
             if (button != null)
             {
                 button.onClick.AddListener(HandleButtonClicked);
+                UiClickFeedback.Ensure(button);
             }
 
             SetupGenderToggle();
@@ -157,7 +157,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            SfxPlayer.Play(SfxCue.UiClick);
+            GameAudio.Play(SfxCue.UiClick);
             character.ToggleGender();
             UpdateGenderVisual();
         }
@@ -263,14 +263,6 @@ namespace Murdoku.Characters
             CharacterDragPreview.Show(character, this, eventData);
         }
 
-        public void OnPointerEnter(PointerEventData eventData)
-        {
-            if (button != null && button.IsInteractable())
-            {
-                SfxPlayer.Play(SfxCue.UiHover);
-            }
-        }
-
         public void OnDrag(PointerEventData eventData)
         {
             CharacterDragPreview.Move(eventData);
@@ -332,7 +324,6 @@ namespace Murdoku.Characters
             if (character != null)
             {
                 Debug.Log($"[Card] 卡片按钮点击：{character.CharacterId}", this);
-                SfxPlayer.Play(SfxCue.SuspectSelect);
                 clicked?.Invoke(this);
             }
         }

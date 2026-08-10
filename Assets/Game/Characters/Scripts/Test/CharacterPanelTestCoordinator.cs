@@ -86,11 +86,7 @@ namespace Murdoku.Characters
 
             if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
             {
-                SfxPlayer.Play(SfxCue.TilePlace);
-            }
-            else
-            {
-                SfxPlayer.Play(SfxCue.WrongMove);
+                GameAudio.Play(SfxCue.CharacterPlace);
             }
 
             switch (result)

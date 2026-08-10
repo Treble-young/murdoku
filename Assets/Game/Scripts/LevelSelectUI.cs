@@ -28,7 +28,7 @@ namespace Murdoku
 
             if (backButton != null)
             {
-                UiSfxFeedback.Ensure(backButton);
+                UiClickFeedback.Ensure(backButton);
                 backButton.onClick.AddListener(BackToMenu);
             }
         }
@@ -84,7 +84,7 @@ namespace Murdoku
                 Button button = item.GetComponentInChildren<Button>();
                 if (button != null)
                 {
-                    UiSfxFeedback.Ensure(button);
+                    UiClickFeedback.Ensure(button);
                     PuzzleData captured = puzzle;
                     button.onClick.AddListener(() => EnterPuzzle(captured));
                 }

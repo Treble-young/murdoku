@@ -7,12 +7,12 @@ using UnityEngine.UI;
 namespace Murdoku.Audio
 {
     /// <summary>
-    /// Generic hover/click feedback for ordinary UI buttons. Semantic controls such as
-    /// suspect cards and board cells play their own cues and are deliberately excluded.
+    /// Adds the shared click sound to ordinary UI buttons. Board cells are excluded because
+    /// successful placement has its own sound and failed placement is intentionally silent.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Button))]
-    public sealed class UiSfxFeedback : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
+    public sealed class UiClickFeedback : MonoBehaviour, IPointerClickHandler
     {
         private static bool sceneHookInstalled;
 
@@ -39,19 +39,17 @@ namespace Murdoku.Audio
 
         public static void Ensure(Button targetButton)
         {
-            if (targetButton == null || targetButton.GetComponent<UiSfxFeedback>() != null)
+            if (targetButton == null || targetButton.GetComponent<UiClickFeedback>() != null)
             {
                 return;
             }
 
-            if (targetButton.GetComponent<global::TextButtonHover>() != null ||
-                targetButton.GetComponentInParent<CharacterCardUI>(true) != null ||
-                targetButton.GetComponentInParent<TestBoardCellUI>(true) != null)
+            if (targetButton.GetComponentInParent<TestBoardCellUI>(true) != null)
             {
                 return;
             }
 
-            targetButton.gameObject.AddComponent<UiSfxFeedback>();
+            targetButton.gameObject.AddComponent<UiClickFeedback>();
         }
 
         private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -76,19 +74,11 @@ namespace Murdoku.Audio
             button = GetComponent<Button>();
         }
 
-        public void OnPointerEnter(PointerEventData eventData)
-        {
-            if (button != null && button.IsInteractable())
-            {
-                SfxPlayer.Play(SfxCue.UiHover);
-            }
-        }
-
         public void OnPointerClick(PointerEventData eventData)
         {
             if (button != null && button.IsInteractable())
             {
-                SfxPlayer.Play(SfxCue.UiClick);
+                GameAudio.Play(SfxCue.UiClick);
             }
         }
     }
