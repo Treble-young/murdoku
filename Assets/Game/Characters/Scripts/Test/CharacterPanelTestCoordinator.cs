@@ -4,6 +4,7 @@ using Murdoku.Audio;
 using Murdoku.PuzzleEditor;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
@@ -24,6 +25,10 @@ namespace Murdoku.Characters
         [Header("保存出题")]
         [SerializeField] private TMP_InputField nameInput;
         [SerializeField] private TMP_Text saveHint;
+
+        private GameObject popupRoot;
+        private TMP_Text popupTitleText;
+        private TMP_Text popupMessageText;
 
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
         private static readonly Color SuccessColor = new Color(0.45f, 0.80f, 0.50f, 1f);
@@ -139,6 +144,12 @@ namespace Murdoku.Characters
                 return;
             }
 
+            if (PuzzleSaveManager.NameExists(puzzleName))
+            {
+                ShowErrorPopup("保存失败", "已存在同名关卡「" + puzzleName + "」，请更换关卡名后再保存。");
+                return;
+            }
+
             int size = testBoard.Rows;
             PuzzleData data = new PuzzleData
             {
@@ -244,6 +255,129 @@ namespace Murdoku.Characters
             }
 
             SetStatus("已载入关卡：" + data.name);
+        }
+
+        private void ShowErrorPopup(string title, string message)
+        {
+            if (popupRoot == null)
+            {
+                EnsureErrorPopup();
+            }
+
+            if (popupRoot == null)
+            {
+                SetSaveHint("无法显示弹窗，请检查场景 Canvas 配置。", true);
+                return;
+            }
+
+            popupRoot.SetActive(true);
+            if (popupTitleText != null)
+            {
+                popupTitleText.text = title;
+            }
+
+            if (popupMessageText != null)
+            {
+                popupMessageText.text = message;
+            }
+        }
+
+        private void EnsureErrorPopup()
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            TMP_FontAsset font = saveHint != null ? saveHint.font : null;
+            if (font == null && nameInput != null && nameInput.textComponent != null)
+            {
+                font = nameInput.textComponent.font;
+            }
+
+            if (canvas == null || font == null)
+            {
+                return;
+            }
+
+            popupRoot = CreateUiObject("SaveErrorPopup", canvas.transform).gameObject;
+            RectTransform root = popupRoot.GetComponent<RectTransform>();
+            Image mask = root.gameObject.AddComponent<Image>();
+            mask.color = new Color(0f, 0f, 0f, 0.55f);
+            Stretch(root);
+
+            RectTransform panel = CreateUiObject("Panel", root).GetComponent<RectTransform>();
+            Image panelImage = panel.gameObject.AddComponent<Image>();
+            panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.98f);
+            panel.anchorMin = new Vector2(0.5f, 0.5f);
+            panel.anchorMax = new Vector2(0.5f, 0.5f);
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            panel.sizeDelta = new Vector2(1008f, 396f);
+            panel.anchoredPosition = Vector2.zero;
+
+            popupTitleText = CreateText("TitleText", panel, font, 40f, FontStyles.Bold);
+            RectTransform titleRect = popupTitleText.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(0f, 72f);
+            titleRect.anchoredPosition = new Vector2(0f, -18f);
+
+            popupMessageText = CreateText("MessageText", panel, font, 32f, FontStyles.Normal);
+            RectTransform messageRect = popupMessageText.rectTransform;
+            Stretch(messageRect);
+            messageRect.offsetMin = new Vector2(54f, 108f);
+            messageRect.offsetMax = new Vector2(-54f, -90f);
+
+            RectTransform okRect = CreateUiObject("OkButton", panel).GetComponent<RectTransform>();
+            okRect.anchorMin = new Vector2(0.5f, 0f);
+            okRect.anchorMax = new Vector2(0.5f, 0f);
+            okRect.pivot = new Vector2(0.5f, 0.5f);
+            okRect.sizeDelta = new Vector2(252f, 79f);
+            okRect.anchoredPosition = new Vector2(0f, 29f);
+
+            Image okImage = okRect.gameObject.AddComponent<Image>();
+            okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
+            Button okButton = okRect.gameObject.AddComponent<Button>();
+            okButton.targetGraphic = okImage;
+            okButton.onClick.AddListener(CloseErrorPopup);
+            UiClickFeedback.Ensure(okButton);
+
+            TMP_Text okLabel = CreateText("Label", okRect, font, 32f, FontStyles.Normal);
+            okLabel.text = "确定";
+            Stretch(okLabel.rectTransform);
+        }
+
+        private static RectTransform CreateUiObject(string name, Transform parent)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return (RectTransform)go.transform;
+        }
+
+        private static TMP_Text CreateText(string name, RectTransform parent, TMP_FontAsset font, float fontSize, FontStyles style)
+        {
+            RectTransform rect = CreateUiObject(name, parent);
+            rect.gameObject.AddComponent<CanvasRenderer>();
+            TMP_Text text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            text.font = font;
+            text.fontSize = fontSize;
+            text.fontStyle = style;
+            text.color = Color.white;
+            text.alignment = TextAlignmentOptions.Center;
+            return text;
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        private void CloseErrorPopup()
+        {
+            if (popupRoot != null)
+            {
+                popupRoot.SetActive(false);
+            }
         }
 
         private void SetSaveHint(string message, bool isError)

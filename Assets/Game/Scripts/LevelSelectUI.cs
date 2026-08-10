@@ -8,16 +8,24 @@ using UnityEngine.UI;
 namespace Murdoku
 {
     /// <summary>
-    /// 选关场景 UI：列出所有已保存的关卡，点击进入出题/游戏场景。
+    /// 选关场景 UI：已保存关卡按“每行两个”的网格展示，支持翻页；
+    /// 每个关卡卡片带删除按钮（点两次确认删除）。
     /// </summary>
     public sealed class LevelSelectUI : MonoBehaviour
     {
-        [SerializeField] private RectTransform contentRoot;
+        private const int PageSize = 6;
+
+        [SerializeField] private RectTransform gridRoot;
         [SerializeField] private GameObject itemTemplate;
+        [SerializeField] private Button prevButton;
+        [SerializeField] private Button nextButton;
+        [SerializeField] private TMP_Text pageText;
         [SerializeField] private Button backButton;
         [SerializeField] private TMP_Text emptyHint;
 
         private readonly List<GameObject> spawnedItems = new List<GameObject>();
+        private List<PuzzleData> puzzles = new List<PuzzleData>();
+        private int currentPage;
 
         private void Awake()
         {
@@ -30,6 +38,18 @@ namespace Murdoku
             {
                 UiClickFeedback.Ensure(backButton);
                 backButton.onClick.AddListener(BackToMenu);
+            }
+
+            if (prevButton != null)
+            {
+                UiClickFeedback.Ensure(prevButton);
+                prevButton.onClick.AddListener(PreviousPage);
+            }
+
+            if (nextButton != null)
+            {
+                UiClickFeedback.Ensure(nextButton);
+                nextButton.onClick.AddListener(NextPage);
             }
         }
 
@@ -44,9 +64,33 @@ namespace Murdoku
             {
                 backButton.onClick.RemoveListener(BackToMenu);
             }
+
+            if (prevButton != null)
+            {
+                prevButton.onClick.RemoveListener(PreviousPage);
+            }
+
+            if (nextButton != null)
+            {
+                nextButton.onClick.RemoveListener(NextPage);
+            }
         }
 
-        private void RefreshList()
+        private void RefreshList(int preferredPage = 0)
+        {
+            puzzles = PuzzleSaveManager.ListPuzzles();
+            currentPage = Mathf.Clamp(preferredPage, 0, Mathf.Max(0, GetPageCount() - 1));
+
+            if (emptyHint != null)
+            {
+                emptyHint.gameObject.SetActive(puzzles.Count == 0);
+            }
+
+            RenderPage();
+            UpdatePageControls();
+        }
+
+        private void RenderPage()
         {
             foreach (GameObject item in spawnedItems)
             {
@@ -58,38 +102,126 @@ namespace Murdoku
 
             spawnedItems.Clear();
 
-            List<PuzzleData> puzzles = PuzzleSaveManager.ListPuzzles();
-            if (emptyHint != null)
-            {
-                emptyHint.gameObject.SetActive(puzzles.Count == 0);
-            }
-
-            if (contentRoot == null || itemTemplate == null)
+            if (gridRoot == null || itemTemplate == null || puzzles.Count == 0)
             {
                 return;
             }
 
-            foreach (PuzzleData puzzle in puzzles)
+            int start = currentPage * PageSize;
+            int count = Mathf.Min(PageSize, puzzles.Count - start);
+            for (int index = 0; index < count; index++)
             {
-                GameObject item = Instantiate(itemTemplate, contentRoot);
+                PuzzleData puzzle = puzzles[start + index];
+                GameObject item = Instantiate(itemTemplate, gridRoot);
                 item.name = "PuzzleItem_" + puzzle.id;
                 item.SetActive(true);
 
-                TMP_Text label = item.GetComponentInChildren<TMP_Text>();
+                Transform labelTransform = item.transform.Find("Label");
+                TMP_Text label = labelTransform == null ? null : labelTransform.GetComponent<TMP_Text>();
                 if (label != null)
                 {
                     label.text = puzzle.name + "（" + puzzle.size + "x" + puzzle.size + "）";
                 }
 
-                Button button = item.GetComponentInChildren<Button>();
-                if (button != null)
+                Button enterButton = item.GetComponent<Button>();
+                if (enterButton != null)
                 {
-                    UiClickFeedback.Ensure(button);
+                    UiClickFeedback.Ensure(enterButton);
                     PuzzleData captured = puzzle;
-                    button.onClick.AddListener(() => EnterPuzzle(captured));
+                    enterButton.onClick.AddListener(() => EnterPuzzle(captured));
+                }
+
+                Transform deleteTransform = item.transform.Find("DeleteButton");
+                Button deleteButton = deleteTransform == null ? null : deleteTransform.GetComponent<Button>();
+                if (deleteButton != null)
+                {
+                    SetupDeleteButton(deleteButton, puzzle);
                 }
 
                 spawnedItems.Add(item);
+            }
+        }
+
+        private void SetupDeleteButton(Button deleteButton, PuzzleData puzzle)
+        {
+            TMP_Text deleteLabel = deleteButton.GetComponentInChildren<TMP_Text>();
+            Image deleteImage = deleteButton.GetComponent<Image>();
+            bool confirmed = false;
+
+            deleteButton.onClick.AddListener(() =>
+            {
+                if (!confirmed)
+                {
+                    confirmed = true;
+                    if (deleteLabel != null)
+                    {
+                        deleteLabel.text = "确认?";
+                    }
+
+                    if (deleteImage != null)
+                    {
+                        deleteImage.color = new Color(0.72f, 0.16f, 0.16f, 1f);
+                    }
+
+                    return;
+                }
+
+                int pageBefore = currentPage;
+                PuzzleSaveManager.DeletePuzzle(puzzle.id);
+                RefreshList(pageBefore);
+            });
+        }
+
+        private void PreviousPage()
+        {
+            if (currentPage <= 0)
+            {
+                return;
+            }
+
+            currentPage--;
+            RenderPage();
+            UpdatePageControls();
+        }
+
+        private void NextPage()
+        {
+            if (currentPage >= GetPageCount() - 1)
+            {
+                return;
+            }
+
+            currentPage++;
+            RenderPage();
+            UpdatePageControls();
+        }
+
+        private int GetPageCount()
+        {
+            if (puzzles == null || puzzles.Count == 0)
+            {
+                return 1;
+            }
+
+            return Mathf.CeilToInt(puzzles.Count / (float)PageSize);
+        }
+
+        private void UpdatePageControls()
+        {
+            int pageCount = GetPageCount();
+            if (prevButton != null)
+            {
+                prevButton.interactable = currentPage > 0;
+            }
+
+            if (nextButton != null)
+            {
+                nextButton.interactable = currentPage < pageCount - 1;
+            }
+
+            if (pageText != null)
+            {
+                pageText.text = "第 " + (currentPage + 1) + " / " + pageCount + " 页";
             }
         }
 

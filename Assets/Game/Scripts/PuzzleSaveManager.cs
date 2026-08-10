@@ -91,6 +91,25 @@ namespace Murdoku
             return result;
         }
 
+        public static bool NameExists(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            List<PuzzleData> puzzles = ListPuzzles();
+            for (int i = 0; i < puzzles.Count; i++)
+            {
+                if (puzzles[i] != null && string.Equals(puzzles[i].name, name, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static bool DeletePuzzle(string id)
         {
             if (string.IsNullOrEmpty(id))
