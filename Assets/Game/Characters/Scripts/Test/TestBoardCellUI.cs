@@ -34,6 +34,8 @@ namespace Murdoku.Characters
         private static readonly Color ErrorHighlightColor = new Color(0.92f, 0.22f, 0.22f, 0.45f);
 
         private Color? backgroundOverride;
+        private Color? floorColor;
+        private Sprite floorSprite;
         private bool interactionEnabled = true;
         private CanvasGroup interactionGroup;
         private Image rowColumnHighlight;
@@ -71,6 +73,8 @@ namespace Murdoku.Characters
             isPlaceable = placeable;
             currentCharacter = null;
             backgroundOverride = null;
+            floorColor = null;
+            floorSprite = null;
             Refresh();
         }
 
@@ -80,6 +84,28 @@ namespace Murdoku.Characters
         public void SetBackgroundOverride(Color? color)
         {
             backgroundOverride = color;
+            Refresh();
+        }
+
+        /// <summary>
+        /// 设置格子的地块颜色（出题时给格子涂色，持久保留，不随模式切换消失）；
+        /// 传 null 恢复默认棋盘格颜色。渲染优先级：区域着色 &gt; 地块图案 &gt; 地块颜色 &gt; 默认棋盘格。
+        /// </summary>
+        public void SetFloorColor(Color? color)
+        {
+            floorColor = color;
+            floorSprite = null;
+            Refresh();
+        }
+
+        /// <summary>
+        /// 设置格子的地块图案（样式地块：方格地砖/木地板/沙滩/草坪/水域等）；
+        /// 传 null 恢复默认棋盘格颜色。渲染优先级：区域着色 &gt; 地块图案 &gt; 地块颜色 &gt; 默认棋盘格。
+        /// </summary>
+        public void SetFloorSprite(Sprite sprite)
+        {
+            floorSprite = sprite;
+            floorColor = null;
             Refresh();
         }
 
@@ -242,10 +268,22 @@ namespace Murdoku.Characters
             {
                 if (backgroundOverride.HasValue)
                 {
+                    backgroundImage.sprite = null;
                     backgroundImage.color = backgroundOverride.Value;
+                }
+                else if (floorSprite != null)
+                {
+                    backgroundImage.sprite = floorSprite;
+                    backgroundImage.color = Color.white;
+                }
+                else if (floorColor.HasValue)
+                {
+                    backgroundImage.sprite = null;
+                    backgroundImage.color = floorColor.Value;
                 }
                 else
                 {
+                    backgroundImage.sprite = null;
                     bool isOffset = (gridPosition.x + gridPosition.y) % 2 != 0;
                     backgroundImage.color = isPlaceable
                         ? (isOffset ? darkCellColor : lightCellColor)

@@ -126,6 +126,21 @@ namespace Murdoku.Characters
             }
         }
 
+        /// <summary>
+        /// 取消当前选中的人物卡（用于与地块选择互斥）。
+        /// </summary>
+        public void ClearSelection()
+        {
+            if (selectedCard == null)
+            {
+                return;
+            }
+
+            selectedCard.SetSelected(false);
+            selectedCard = null;
+            SelectionChanged?.Invoke(null);
+        }
+
         public void Rebuild()
         {
             ClearCards();

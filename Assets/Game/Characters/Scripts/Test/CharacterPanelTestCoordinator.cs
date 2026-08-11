@@ -27,6 +27,8 @@ namespace Murdoku.Characters
         [SerializeField] private TMP_InputField nameInput;
         [SerializeField] private TMP_Text saveHint;
 
+        private RegionPanelUI regionPanel;
+
         private GameObject popupRoot;
         private TMP_Text popupTitleText;
         private TMP_Text popupMessageText;
@@ -55,6 +57,7 @@ namespace Murdoku.Characters
         {
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
+            EnsureRegionPanel();
             StartCoroutine(LoadSelectedPuzzleRoutine());
         }
 
@@ -69,6 +72,18 @@ namespace Murdoku.Characters
 
         private void HandleCellClicked(ICharacterPlacementCell cell)
         {
+            // 地块涂色优先：选中地块卡时点击格子 = 给格子铺上对应图案，不进入人物放置。
+            RegionDefinition selectedRegion = regionPanel == null ? null : regionPanel.SelectedRegion;
+            if (selectedRegion != null)
+            {
+                if (cell is TestBoardCellUI cellUI)
+                {
+                    cellUI.SetFloorSprite(selectedRegion.Sprite);
+                }
+
+                return;
+            }
+
             if (placementController == null)
             {
                 SetStatus("人物放置控制器未配置。");
@@ -440,6 +455,37 @@ namespace Murdoku.Characters
                 return;
             }
 
+            // 优先把按钮放进嫌疑人面板的标题区：隐藏「嫌疑人」标题文本，按钮占用该区域，
+            // 并随面板的 Tab 显隐（面板 SetActive 时按钮一并隐藏/显示，与嫌疑人卡片一致）。
+            GameObject characterPanel = GameObject.Find("CharacterPanel");
+            RectTransform header = characterPanel == null
+                ? null
+                : FindChildByName<RectTransform>(characterPanel.transform, "Header");
+
+            if (header != null)
+            {
+                TMP_Text title = FindChildByName<TMP_Text>(characterPanel.transform, "TitleText");
+                if (title != null)
+                {
+                    title.gameObject.SetActive(false);
+                }
+
+                if (clueButton == null)
+                {
+                    clueButton = CreateHeaderButton(header, "ClueButton", "编辑线索", true);
+                    clueButton.onClick.AddListener(OpenClueEditor);
+                }
+
+                if (submitButton == null)
+                {
+                    submitButton = CreateHeaderButton(header, "SubmitButton", "提交", false);
+                    submitButton.onClick.AddListener(SubmitPuzzle);
+                }
+
+                return;
+            }
+
+            // 兜底：找不到嫌疑人面板标题区时，按钮挂 Canvas 顶部（旧行为）。
             Canvas canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
             {
@@ -456,6 +502,139 @@ namespace Murdoku.Characters
             {
                 submitButton = CreateTopButton(canvas.transform, "SubmitButton", "提交", new Vector2(-70f, -12f));
                 submitButton.onClick.AddListener(SubmitPuzzle);
+            }
+        }
+
+        /// <summary>
+        /// 在嫌疑人面板 Header 的标题区创建按钮（原「嫌疑人」文本区域，左/右各半）。
+        /// </summary>
+        private Button CreateHeaderButton(RectTransform header, string objectName, string labelText, bool isLeft)
+        {
+            RectTransform rect = CreateUiObject(objectName, header).GetComponent<RectTransform>();
+            rect.anchorMin = isLeft ? new Vector2(0f, 0.46f) : new Vector2(0.5f, 0.46f);
+            rect.anchorMax = isLeft ? new Vector2(0.5f, 1f) : new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = new Vector2(isLeft ? 8f : 4f, 6f);
+            rect.offsetMax = new Vector2(isLeft ? -4f : -8f, -4f);
+
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = new Color(0.22f, 0.48f, 0.86f, 1f);
+
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            UiClickFeedback.Ensure(button);
+
+            TMP_Text label = CreateText("Label", rect, GetUiFont(), 24f, FontStyles.Bold);
+            label.text = labelText;
+            Stretch(label.rectTransform);
+            label.raycastTarget = false;
+            return button;
+        }
+
+        private static T FindChildByName<T>(Transform root, string name) where T : Component
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            foreach (Transform child in root)
+            {
+                if (child.name == name)
+                {
+                    T component = child.GetComponent<T>();
+                    if (component != null)
+                    {
+                        return component;
+                    }
+                }
+
+                T nested = FindChildByName<T>(child, name);
+                if (nested != null)
+                {
+                    return nested;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 初始化地块面板：在「地块」Tab 的 RegionPanel 上挂载 RegionPanelUI 并构建卡片，
+        /// 同时接入「地块选择 ⇄ 人物选择」互斥逻辑。
+        /// 注意：不能用 GameObject.Find（只能找到激活状态的对象），
+        /// 地块面板可能已被 Tab 切换设为隐藏——从 Canvas 递归查找（Transform 树不受 active 影响）。
+        /// </summary>
+        private void EnsureRegionPanel()
+        {
+            if (regionPanel != null)
+            {
+                return;
+            }
+
+            GameObject regionObject = null;
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas != null)
+            {
+                RectTransform regionRect = FindChildByName<RectTransform>(canvas.transform, "RegionPanel");
+                if (regionRect != null)
+                {
+                    regionObject = regionRect.gameObject;
+                }
+            }
+
+            // 兜底：万一不在 Canvas 层级下。
+            if (regionObject == null)
+            {
+                regionObject = GameObject.Find("RegionPanel");
+            }
+
+            if (regionObject == null)
+            {
+                return;
+            }
+
+            regionPanel = regionObject.GetComponent<RegionPanelUI>();
+            if (regionPanel == null)
+            {
+                regionPanel = regionObject.AddComponent<RegionPanelUI>();
+            }
+
+            regionPanel.Configure(GetUiFont());
+            regionPanel.SelectionChanged += HandleRegionSelectionChanged;
+
+            CharacterPanelUI panel = placementController == null ? null : placementController.SelectionSource;
+            if (panel != null)
+            {
+                panel.SelectionChanged += HandleCharacterSelectionChanged;
+            }
+        }
+
+        /// <summary>
+        /// 选中地块时取消人物选择（互斥）。
+        /// </summary>
+        private void HandleRegionSelectionChanged(RegionDefinition region)
+        {
+            if (region == null)
+            {
+                return;
+            }
+
+            CharacterPanelUI panel = placementController == null ? null : placementController.SelectionSource;
+            if (panel != null)
+            {
+                panel.ClearSelection();
+            }
+        }
+
+        /// <summary>
+        /// 选中人物时取消地块选择（互斥）。
+        /// </summary>
+        private void HandleCharacterSelectionChanged(CharacterData character)
+        {
+            if (character != null && regionPanel != null)
+            {
+                regionPanel.ClearSelection();
             }
         }
 
@@ -495,13 +674,30 @@ namespace Murdoku.Characters
                 return null;
             }
 
-            statusText = CreateText("PlacementStatusText", canvas.transform as RectTransform, font, 22f, FontStyles.Normal);
-            RectTransform rect = statusText.rectTransform;
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(0f, 95f);
-            rect.sizeDelta = new Vector2(620f, 40f);
+            // 提示文字：优先挂到左侧面板容器下（面板正下方、随面板居中）；
+            // 找不到容器时回退为全局底部居中（旧行为）。
+            RectTransform container = FindChildByName<RectTransform>(canvas.transform, "LeftPanelContainer");
+            if (container != null)
+            {
+                statusText = CreateText("PlacementStatusText", container, font, 22f, FontStyles.Normal);
+                RectTransform rect = statusText.rectTransform;
+                rect.anchorMin = new Vector2(0.5f, 0f);
+                rect.anchorMax = new Vector2(0.5f, 0f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = new Vector2(0f, -40f);
+                rect.sizeDelta = new Vector2(880f, 40f);
+            }
+            else
+            {
+                statusText = CreateText("PlacementStatusText", canvas.transform as RectTransform, font, 22f, FontStyles.Normal);
+                RectTransform rect = statusText.rectTransform;
+                rect.anchorMin = new Vector2(0.5f, 0f);
+                rect.anchorMax = new Vector2(0.5f, 0f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = new Vector2(0f, 95f);
+                rect.sizeDelta = new Vector2(620f, 40f);
+            }
+
             statusText.color = new Color(0.85f, 0.90f, 0.95f, 1f);
             return statusText;
         }
