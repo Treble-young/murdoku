@@ -40,6 +40,8 @@ namespace Murdoku.Characters
         private readonly List<GameObject> clueRows = new List<GameObject>();
         private readonly List<TMP_InputField> clueInputs = new List<TMP_InputField>();
         private readonly List<CharacterData> clueInputCharacters = new List<CharacterData>();
+        private bool playMode;
+        private List<PuzzlePlacementData> solutionPlacements;
 
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
         private static readonly Color SuccessColor = new Color(0.45f, 0.80f, 0.50f, 1f);
@@ -55,9 +57,11 @@ namespace Murdoku.Characters
 
         private void Start()
         {
+            playMode = !string.IsNullOrEmpty(PuzzleSession.SelectedPuzzleId);
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
             EnsureRegionPanel();
+            ApplyModeVisibility();
             StartCoroutine(LoadSelectedPuzzleRoutine());
         }
 
@@ -176,8 +180,18 @@ namespace Murdoku.Characters
 
             if (PuzzleSaveManager.NameExists(puzzleName))
             {
-                ShowErrorPopup("保存失败", "已存在同名关卡「" + puzzleName + "」，请更换关卡名后再保存。");
+                ShowErrorPopup("保存失败", "已存在同名关卡  " + puzzleName + "  ，请更换关卡名后再保存。");
                 return;
+            }
+
+            if (placementController != null && placementController.SelectionSource != null)
+            {
+                int missing = placementController.CountMissingCharacters(placementController.SelectionSource.Characters);
+                if (missing > 0)
+                {
+                    ShowErrorPopup("保存失败", "还有 " + missing + " 名角色没有摆到棋盘上，请先摆好所有角色的位置作为标准答案再保存。");
+                    return;
+                }
             }
 
             int size = testBoard.Rows;
@@ -233,7 +247,8 @@ namespace Murdoku.Characters
             }
 
             PuzzleSaveManager.SavePuzzle(data);
-            SetSaveHint("已保存关卡「" + puzzleName + "」。", false);
+            SetSaveHint(string.Empty, false);
+            ShowPopup("保存成功", "已保存关卡  " + puzzleName + "  。");
         }
 
         private IEnumerator LoadSelectedPuzzleRoutine()
@@ -284,32 +299,9 @@ namespace Murdoku.Characters
                 placementController.SelectionSource.ApplyClues(data.clues);
             }
 
-            if (placementController != null && data.placements != null && testBoard != null)
-            {
-                foreach (PuzzlePlacementData placement in data.placements)
-                {
-                    if (placement == null)
-                    {
-                        continue;
-                    }
-
-                    CharacterData character = placementController.FindCharacterById(placement.characterId);
-                    if (character == null)
-                    {
-                        continue;
-                    }
-
-                    if (placement.cellIndex < 0 || placement.cellIndex >= testBoard.Cells.Count)
-                    {
-                        continue;
-                    }
-
-                    placementController.HandleCharacterDropped(character, testBoard.Cells[placement.cellIndex]);
-                }
-            }
-
+            solutionPlacements = data.placements;
             RefreshHighlights();
-            SetStatus("已载入关卡：" + data.name);
+            SetStatus("已载入关卡：" + data.name + "，请根据线索放置人物后提交。");
         }
 
         private void ShowErrorPopup(string title, string message)
@@ -972,6 +964,58 @@ namespace Murdoku.Characters
                 return;
             }
 
+            if (testBoard == null)
+            {
+                ShowErrorPopup("提交失败", "棋盘未配置，无法判定。");
+                return;
+            }
+
+            if (solutionPlacements == null || solutionPlacements.Count == 0)
+            {
+                ShowErrorPopup("提交失败", "这关没有标准答案，无法判定是否正确（请回到创建界面摆好人物再保存）。");
+                return;
+            }
+
+            HashSet<string> solvedIds = new HashSet<string>();
+            foreach (PuzzlePlacementData solution in solutionPlacements)
+            {
+                if (solution == null || string.IsNullOrEmpty(solution.characterId))
+                {
+                    continue;
+                }
+
+                CharacterData solutionCharacter = placementController.FindCharacterById(solution.characterId);
+                if (solutionCharacter == null)
+                {
+                    ShowErrorPopup("提交失败", "标准答案与当前关卡不匹配，无法判定。");
+                    return;
+                }
+
+                if (!placementController.TryGetPlacement(solutionCharacter, out ICharacterPlacementCell solutionCell) ||
+                    solutionCell == null)
+                {
+                    ShowErrorPopup("提交失败", solutionCharacter.DisplayName + " 还没有放置，请根据线索继续推理。");
+                    return;
+                }
+
+                int expectedIndex = solution.cellIndex;
+                int actualIndex = solutionCell.GridPosition.y * testBoard.Columns + solutionCell.GridPosition.x;
+                if (actualIndex != expectedIndex)
+                {
+                    HighlightCells(new List<ICharacterPlacementCell> { solutionCell });
+                    ShowErrorPopup("位置错误", solutionCharacter.DisplayName + " 的位置不对，请再核对线索（该格子已标红）。");
+                    return;
+                }
+
+                solvedIds.Add(solution.characterId);
+            }
+
+            if (solvedIds.Count < characters.Count)
+            {
+                ShowErrorPopup("提交失败", "标准答案不完整：有角色没有答案位置，无法判定（请回到创建界面补全）。");
+                return;
+            }
+
             if (wallEditController == null || wallEditController.Walls == null)
             {
                 ShowErrorPopup("提交失败", "棋盘墙体数据不可用，无法判定房间。");
@@ -1065,6 +1109,78 @@ namespace Murdoku.Characters
                 {
                     cellUI.SetErrorHighlight(true);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 按进入模式隐藏/显示编辑器与游玩 UI：
+        /// - 创建模式：显示保存条、棋盘大小、地块面板与「编辑线索」按钮，隐藏「提交」；
+        /// - 游玩模式：隐藏保存条、棋盘大小、地块面板与「编辑线索」按钮，显示「提交」，并强制回到放置模式。
+        /// </summary>
+        private void ApplyModeVisibility()
+        {
+            GameObject savePanelObject = nameInput != null && nameInput.transform.parent != null
+                ? nameInput.transform.parent.gameObject
+                : null;
+
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (savePanelObject == null)
+            {
+                RectTransform savePanelRect = canvas == null
+                    ? null
+                    : FindChildByName<RectTransform>(canvas.transform, "SavePanel");
+                savePanelObject = savePanelRect == null ? null : savePanelRect.gameObject;
+            }
+
+            BoardSizePanelUI boardSizePanel = FindFirstObjectByType<BoardSizePanelUI>();
+
+            GameObject regionsPanelObject = regionPanel != null ? regionPanel.gameObject : null;
+            if (regionsPanelObject == null)
+            {
+                RectTransform regionRect = canvas == null
+                    ? null
+                    : FindChildByName<RectTransform>(canvas.transform, "RegionPanel");
+                regionsPanelObject = regionRect == null ? null : regionRect.gameObject;
+            }
+
+            RectTransform regionsTabRect = canvas == null
+                ? null
+                : FindChildByName<RectTransform>(canvas.transform, "RegionsTab");
+            GameObject regionsTabObject = regionsTabRect == null ? null : regionsTabRect.gameObject;
+
+            if (savePanelObject != null)
+            {
+                savePanelObject.SetActive(!playMode);
+            }
+
+            if (boardSizePanel != null)
+            {
+                boardSizePanel.gameObject.SetActive(!playMode);
+            }
+
+            if (regionsPanelObject != null)
+            {
+                regionsPanelObject.SetActive(!playMode);
+            }
+
+            if (regionsTabObject != null)
+            {
+                regionsTabObject.SetActive(!playMode);
+            }
+
+            if (clueButton != null)
+            {
+                clueButton.gameObject.SetActive(!playMode);
+            }
+
+            if (submitButton != null)
+            {
+                submitButton.gameObject.SetActive(playMode);
+            }
+
+            if (playMode && wallEditController != null)
+            {
+                wallEditController.SetMode(WallEditController.EditorMode.Place);
             }
         }
 
