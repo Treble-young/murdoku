@@ -35,6 +35,8 @@ namespace Murdoku.Characters
         private TMP_Text statusText;
         private Button clueButton;
         private Button submitButton;
+        private Button undoButton;
+        private Button redoButton;
         private GameObject cluePanelRoot;
         private RectTransform clueContentRect;
         private readonly List<GameObject> clueRows = new List<GameObject>();
@@ -82,7 +84,7 @@ namespace Murdoku.Characters
             {
                 if (cell is TestBoardCellUI cellUI)
                 {
-                    cellUI.SetFloorSprite(selectedRegion.Sprite);
+                    cellUI.SetFloorTile(selectedRegion.Index, selectedRegion.Sprite);
                 }
 
                 return;
@@ -246,6 +248,13 @@ namespace Murdoku.Characters
                 }
             }
 
+            // 保存格子地块（-1 = 无地块，否则为地块样式索引）。
+            data.floorTiles = new int[size * size];
+            for (int index = 0; index < testBoard.Cells.Count && index < data.floorTiles.Length; index++)
+            {
+                data.floorTiles[index] = testBoard.Cells[index].FloorTileIndex;
+            }
+
             PuzzleSaveManager.SavePuzzle(data);
             SetSaveHint(string.Empty, false);
             ShowPopup("保存成功", "已保存关卡  " + puzzleName + "  。");
@@ -294,14 +303,47 @@ namespace Murdoku.Characters
                 wallEditController.ClearPendingWallState();
             }
 
+            // 恢复格子地块（出题时铺的地块图案）。
+            RestoreFloorTiles(data);
+
             if (placementController != null && placementController.SelectionSource != null)
             {
                 placementController.SelectionSource.ApplyClues(data.clues);
             }
 
             solutionPlacements = data.placements;
+            if (placementController != null)
+            {
+                placementController.ClearUndoHistory();
+            }
+
             RefreshHighlights();
             SetStatus("已载入关卡：" + data.name + "，请根据线索放置人物后提交。");
+        }
+
+        /// <summary>
+        /// 把存档中的格子地块恢复显示到棋盘（-1 = 无地块）。
+        /// </summary>
+        private void RestoreFloorTiles(PuzzleData data)
+        {
+            if (testBoard == null || data.floorTiles == null || data.floorTiles.Length == 0)
+            {
+                return;
+            }
+
+            RegionStyleFactory.EnsureSprites();
+            RegionDefinition[] definitions = RegionStyleFactory.All;
+
+            for (int index = 0; index < testBoard.Cells.Count && index < data.floorTiles.Length; index++)
+            {
+                int tileIndex = data.floorTiles[index];
+                if (tileIndex < 0 || tileIndex >= definitions.Length)
+                {
+                    continue;
+                }
+
+                testBoard.Cells[index].SetFloorTile(tileIndex, definitions[tileIndex].Sprite);
+            }
         }
 
         private void ShowErrorPopup(string title, string message)
@@ -442,7 +484,7 @@ namespace Murdoku.Characters
 
         private void EnsureGameplayButtons()
         {
-            if (clueButton != null && submitButton != null)
+            if (clueButton != null && submitButton != null && undoButton != null && redoButton != null)
             {
                 return;
             }
@@ -464,13 +506,30 @@ namespace Murdoku.Characters
 
                 if (clueButton == null)
                 {
-                    clueButton = CreateHeaderButton(header, "ClueButton", "编辑线索", true);
+                    clueButton = CreateHeaderButton(header, "ClueButton", "编辑线索",
+                        new Vector2(0f, 0.46f), new Vector2(0.5f, 1f));
                     clueButton.onClick.AddListener(OpenClueEditor);
+                }
+
+                // 游玩模式按钮区（恢复/撤销/提交）：恢复在撤销左边。
+                if (redoButton == null)
+                {
+                    redoButton = CreateHeaderButton(header, "RedoButton", "恢复",
+                        new Vector2(0f, 0.46f), new Vector2(0.25f, 1f));
+                    redoButton.onClick.AddListener(HandleRedoClicked);
+                }
+
+                if (undoButton == null)
+                {
+                    undoButton = CreateHeaderButton(header, "UndoButton", "撤销",
+                        new Vector2(0.25f, 0.46f), new Vector2(0.5f, 1f));
+                    undoButton.onClick.AddListener(HandleUndoClicked);
                 }
 
                 if (submitButton == null)
                 {
-                    submitButton = CreateHeaderButton(header, "SubmitButton", "提交", false);
+                    submitButton = CreateHeaderButton(header, "SubmitButton", "提交",
+                        new Vector2(0.5f, 0.46f), new Vector2(1f, 1f));
                     submitButton.onClick.AddListener(SubmitPuzzle);
                 }
 
@@ -498,16 +557,22 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
-        /// 在嫌疑人面板 Header 的标题区创建按钮（原「嫌疑人」文本区域，左/右各半）。
+        /// 在嫌疑人面板 Header 的标题区创建按钮（原「嫌疑人」文本区域），
+        /// 通过 anchorMin/anchorMax 指定占用区段（如左半/右半/三分区）。
         /// </summary>
-        private Button CreateHeaderButton(RectTransform header, string objectName, string labelText, bool isLeft)
+        private Button CreateHeaderButton(
+            RectTransform header,
+            string objectName,
+            string labelText,
+            Vector2 anchorMin,
+            Vector2 anchorMax)
         {
             RectTransform rect = CreateUiObject(objectName, header).GetComponent<RectTransform>();
-            rect.anchorMin = isLeft ? new Vector2(0f, 0.46f) : new Vector2(0.5f, 0.46f);
-            rect.anchorMax = isLeft ? new Vector2(0.5f, 1f) : new Vector2(1f, 1f);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.offsetMin = new Vector2(isLeft ? 8f : 4f, 6f);
-            rect.offsetMax = new Vector2(isLeft ? -4f : -8f, -4f);
+            rect.offsetMin = new Vector2(4f, 6f);
+            rect.offsetMax = new Vector2(-4f, -4f);
 
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = new Color(0.22f, 0.48f, 0.86f, 1f);
@@ -516,7 +581,7 @@ namespace Murdoku.Characters
             button.targetGraphic = image;
             UiClickFeedback.Ensure(button);
 
-            TMP_Text label = CreateText("Label", rect, GetUiFont(), 24f, FontStyles.Bold);
+            TMP_Text label = CreateText("Label", rect, GetUiFont(), 22f, FontStyles.Bold);
             label.text = labelText;
             Stretch(label.rectTransform);
             label.raycastTarget = false;
@@ -928,6 +993,50 @@ namespace Murdoku.Characters
             }
         }
 
+        /// <summary>
+        /// 游玩模式撤销：回退最近一步人物放置/移动操作（多步可连续撤销）。
+        /// </summary>
+        private void HandleUndoClicked()
+        {
+            if (placementController == null)
+            {
+                SetStatus("放置控制器不可用。", true);
+                return;
+            }
+
+            if (placementController.UndoLastPlacement())
+            {
+                RefreshHighlights();
+                SetStatus("已撤销上一步操作。");
+            }
+            else
+            {
+                SetStatus("没有可撤销的操作。");
+            }
+        }
+
+        /// <summary>
+        /// 游玩模式恢复：重做最近一次被撤销的放置/移动操作（多步可连续恢复）。
+        /// </summary>
+        private void HandleRedoClicked()
+        {
+            if (placementController == null)
+            {
+                SetStatus("放置控制器不可用。", true);
+                return;
+            }
+
+            if (placementController.RedoLastPlacement())
+            {
+                RefreshHighlights();
+                SetStatus("已恢复上一步操作。");
+            }
+            else
+            {
+                SetStatus("没有可恢复的操作。");
+            }
+        }
+
         private void SubmitPuzzle()
         {
             if (testBoard != null)
@@ -1158,9 +1267,15 @@ namespace Murdoku.Characters
                 boardSizePanel.gameObject.SetActive(!playMode);
             }
 
-            if (regionsPanelObject != null)
+            // 面板显隐交给 LeftPanelTabsUI 的 Tab 切换管理，这里不再直接 SetActive 地块面板，
+            // 避免覆盖 Tab 切换的初始状态（否则出题模式初始会错误显示地块面板）。
+            // 仅在游玩模式强制切到嫌疑人面板（地块 Tab 不可用）；出题模式保持 Tab 的初始状态（嫌疑人面板）。
+            if (playMode)
             {
-                regionsPanelObject.SetActive(!playMode);
+                if (regionsPanelObject != null)
+                {
+                    regionsPanelObject.SetActive(false);
+                }
             }
 
             if (regionsTabObject != null)
@@ -1176,6 +1291,25 @@ namespace Murdoku.Characters
             if (submitButton != null)
             {
                 submitButton.gameObject.SetActive(playMode);
+            }
+
+            if (undoButton != null)
+            {
+                undoButton.gameObject.SetActive(playMode);
+            }
+
+            if (redoButton != null)
+            {
+                redoButton.gameObject.SetActive(playMode);
+            }
+
+            // 游玩模式禁用嫌疑人卡的性别切换（出题模式可编辑性别）。
+            CharacterPanelUI characterPanel = placementController == null
+                ? null
+                : placementController.SelectionSource;
+            if (characterPanel != null)
+            {
+                characterPanel.SetGenderToggleEnabled(!playMode);
             }
 
             if (playMode && wallEditController != null)

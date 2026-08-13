@@ -25,6 +25,14 @@ namespace Murdoku.PuzzleEditor
         public RegionStyle Style;
         public Sprite Sprite;
 
+        /// <summary>
+        /// 素材文件名（不含扩展名，Resources/RegionTiles/ 下的同名图片优先于程序生成图案）。
+        /// </summary>
+        public string SpriteKey;
+
+        /// <summary>在 RegionStyleFactory.All 中的索引（用于关卡序列化保存）。</summary>
+        public int Index;
+
         public string DisplayName => $"{StyleName} {VariantName}";
     }
 
@@ -38,39 +46,79 @@ namespace Murdoku.PuzzleEditor
         public static readonly RegionDefinition[] All =
         {
             // 方格地砖
-            Def("方格地砖", "灰白", RegionStyle.Checkered, new Color(0.80f, 0.82f, 0.85f, 1f)),
-            Def("方格地砖", "米黄", RegionStyle.Checkered, new Color(0.88f, 0.81f, 0.63f, 1f)),
-            Def("方格地砖", "蓝灰", RegionStyle.Checkered, new Color(0.66f, 0.75f, 0.83f, 1f)),
+            Def("方格地砖", "灰白", RegionStyle.Checkered, new Color(0.80f, 0.82f, 0.85f, 1f), "checkered_light"),
+            Def("方格地砖", "米黄", RegionStyle.Checkered, new Color(0.88f, 0.81f, 0.63f, 1f), "checkered_beige"),
+            Def("方格地砖", "蓝灰", RegionStyle.Checkered, new Color(0.66f, 0.75f, 0.83f, 1f), "checkered_slate"),
             // 木地板
-            Def("木地板", "浅棕", RegionStyle.Wood, new Color(0.77f, 0.59f, 0.39f, 1f)),
-            Def("木地板", "中棕", RegionStyle.Wood, new Color(0.63f, 0.45f, 0.28f, 1f)),
-            Def("木地板", "红棕", RegionStyle.Wood, new Color(0.55f, 0.35f, 0.23f, 1f)),
+            Def("木地板", "浅棕", RegionStyle.Wood, new Color(0.77f, 0.59f, 0.39f, 1f), "wood_light"),
+            Def("木地板", "中棕", RegionStyle.Wood, new Color(0.63f, 0.45f, 0.28f, 1f), "wood_medium"),
+            Def("木地板", "红棕", RegionStyle.Wood, new Color(0.55f, 0.35f, 0.23f, 1f), "wood_dark"),
             // 沙滩
-            Def("沙滩", "浅黄", RegionStyle.Sand, new Color(0.93f, 0.87f, 0.65f, 1f)),
-            Def("沙滩", "金黄", RegionStyle.Sand, new Color(0.88f, 0.78f, 0.46f, 1f)),
-            Def("沙滩", "沙橙", RegionStyle.Sand, new Color(0.87f, 0.72f, 0.49f, 1f)),
+            Def("沙滩", "浅黄", RegionStyle.Sand, new Color(0.93f, 0.87f, 0.65f, 1f), "sand_light"),
+            Def("沙滩", "金黄", RegionStyle.Sand, new Color(0.88f, 0.78f, 0.46f, 1f), "sand_gold"),
+            Def("沙滩", "沙橙", RegionStyle.Sand, new Color(0.87f, 0.72f, 0.49f, 1f), "sand_orange"),
             // 草坪
-            Def("草坪", "浅绿", RegionStyle.Grass, new Color(0.56f, 0.79f, 0.43f, 1f)),
-            Def("草坪", "草绿", RegionStyle.Grass, new Color(0.38f, 0.68f, 0.30f, 1f)),
-            Def("草坪", "深绿", RegionStyle.Grass, new Color(0.26f, 0.56f, 0.24f, 1f)),
+            Def("草坪", "浅绿", RegionStyle.Grass, new Color(0.56f, 0.79f, 0.43f, 1f), "grass_light"),
+            Def("草坪", "草绿", RegionStyle.Grass, new Color(0.38f, 0.68f, 0.30f, 1f), "grass_mid"),
+            Def("草坪", "深绿", RegionStyle.Grass, new Color(0.26f, 0.56f, 0.24f, 1f), "grass_dark"),
             // 水域
-            Def("水域", "浅蓝", RegionStyle.Water, new Color(0.43f, 0.68f, 0.88f, 1f)),
-            Def("水域", "天蓝", RegionStyle.Water, new Color(0.25f, 0.55f, 0.85f, 1f)),
-            Def("水域", "深蓝", RegionStyle.Water, new Color(0.14f, 0.38f, 0.72f, 1f)),
+            Def("水域", "浅蓝", RegionStyle.Water, new Color(0.43f, 0.68f, 0.88f, 1f), "water_light"),
+            Def("水域", "天蓝", RegionStyle.Water, new Color(0.25f, 0.55f, 0.85f, 1f), "water_sky"),
+            Def("水域", "深蓝", RegionStyle.Water, new Color(0.14f, 0.38f, 0.72f, 1f), "water_deep"),
         };
 
         /// <summary>
-        /// 为所有定义生成图案 Sprite（重复调用安全：已生成的不再重建）。
+        /// 为所有定义确定 Sprite 并记录索引（重复调用安全：已生成的不再重建）。
+        /// 优先加载 Resources/RegionTiles/ 下的同名素材；缺失时回退程序生成图案。
         /// </summary>
         public static void EnsureSprites()
         {
-            foreach (RegionDefinition def in All)
+            for (int index = 0; index < All.Length; index++)
             {
+                RegionDefinition def = All[index];
+                def.Index = index;
                 if (def.Sprite == null)
                 {
-                    def.Sprite = CreateSprite(def);
+                    def.Sprite = LoadSpriteOrFallback(def);
                 }
             }
+        }
+
+        private static Sprite LoadSpriteOrFallback(RegionDefinition def)
+        {
+            // 1. 直接加载 Sprite（导入类型已设为 Sprite 时）。
+            Sprite sprite = TryLoadSprite(def.SpriteKey);
+            if (sprite != null)
+            {
+                return sprite;
+            }
+
+            // 2. 兜底：加载为 Texture2D 再包一层 Sprite（图片未设置导入类型也能用）。
+            if (!string.IsNullOrEmpty(def.SpriteKey))
+            {
+                Texture2D texture = Resources.Load<Texture2D>($"RegionTiles/{def.SpriteKey}");
+                if (texture != null)
+                {
+                    return Sprite.Create(
+                        texture,
+                        new Rect(0f, 0f, texture.width, texture.height),
+                        new Vector2(0.5f, 0.5f),
+                        100f);
+                }
+            }
+
+            // 3. 都没有素材：回退程序生成图案。
+            return CreateSprite(def);
+        }
+
+        private static Sprite TryLoadSprite(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return null;
+            }
+
+            return Resources.Load<Sprite>($"RegionTiles/{key}");
         }
 
         /// <summary>
@@ -106,9 +154,16 @@ namespace Murdoku.PuzzleEditor
             return Sprite.Create(texture, new Rect(0f, 0f, TexSize, TexSize), new Vector2(0.5f, 0.5f), 64f);
         }
 
-        private static RegionDefinition Def(string style, string variant, RegionStyle s, Color c)
+        private static RegionDefinition Def(string style, string variant, RegionStyle s, Color c, string spriteKey)
         {
-            return new RegionDefinition { StyleName = style, VariantName = variant, Style = s, BaseColor = c };
+            return new RegionDefinition
+            {
+                StyleName = style,
+                VariantName = variant,
+                Style = s,
+                BaseColor = c,
+                SpriteKey = spriteKey
+            };
         }
 
         private static Color Lighten(Color c, float t)

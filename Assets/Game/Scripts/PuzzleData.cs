@@ -34,6 +34,11 @@ namespace Murdoku
         /// <summary>垂直墙，size × (size-1)，行优先展平。</summary>
         public bool[] verticalWalls;
 
+        /// <summary>
+        /// 格子地块，size × size 展平；-1 表示无地块，否则为 RegionStyleFactory.All 的索引。
+        /// </summary>
+        public int[] floorTiles;
+
         public List<PuzzlePlacementData> placements = new List<PuzzlePlacementData>();
         public List<PuzzleClueData> clues = new List<PuzzleClueData>();
     }

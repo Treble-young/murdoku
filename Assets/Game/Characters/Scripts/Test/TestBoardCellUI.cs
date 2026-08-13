@@ -36,10 +36,12 @@ namespace Murdoku.Characters
         private Color? backgroundOverride;
         private Color? floorColor;
         private Sprite floorSprite;
+        private int floorTileIndex = -1;
         private bool interactionEnabled = true;
         private CanvasGroup interactionGroup;
         private Image rowColumnHighlight;
         private Image errorHighlight;
+        private Image regionOverlay;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
@@ -75,6 +77,7 @@ namespace Murdoku.Characters
             backgroundOverride = null;
             floorColor = null;
             floorSprite = null;
+            floorTileIndex = -1;
             Refresh();
         }
 
@@ -106,7 +109,44 @@ namespace Murdoku.Characters
         {
             floorSprite = sprite;
             floorColor = null;
+            floorTileIndex = -1;
             Refresh();
+        }
+
+        /// <summary>
+        /// 设置格子的地块（样式索引 + 图案，用于保存/载入）；
+        /// tileIndex 为 -1 表示清除地块。
+        /// </summary>
+        public void SetFloorTile(int tileIndex, Sprite sprite)
+        {
+            floorTileIndex = tileIndex;
+            floorSprite = tileIndex < 0 ? null : sprite;
+            floorColor = null;
+            Refresh();
+        }
+
+        /// <summary>当前地块样式索引（-1 = 无地块），用于保存关卡。</summary>
+        public int FloorTileIndex => floorTileIndex;
+
+        /// <summary>
+        /// 设置区域区分叠加层（半透明，叠加在地块图案上方辅助区分区域，不覆盖地块）；
+        /// 传 null 清除。渲染顺序：背景（地块）→ 区域叠加层 → 棋子 → 高亮。
+        /// </summary>
+        public void SetRegionOverlay(Color? color)
+        {
+            if (color.HasValue)
+            {
+                Image overlay = EnsureHighlight(ref regionOverlay, color.Value);
+                if (overlay != null)
+                {
+                    overlay.gameObject.SetActive(true);
+                    overlay.color = color.Value;
+                }
+            }
+            else if (regionOverlay != null)
+            {
+                regionOverlay.gameObject.SetActive(false);
+            }
         }
 
         /// <summary>
@@ -293,7 +333,14 @@ namespace Murdoku.Characters
 
             if (coordinateText != null)
             {
-                coordinateText.text = $"{gridPosition.x},{gridPosition.y}";
+                // 有地块（图案/颜色）时隐藏坐标文字，避免文字叠加在图案上造成"色差"；
+                // 无地块时仍显示坐标（测试/编辑辅助）。
+                bool hasFloor = floorSprite != null || floorColor.HasValue || backgroundOverride.HasValue;
+                coordinateText.gameObject.SetActive(!hasFloor);
+                if (!hasFloor)
+                {
+                    coordinateText.text = $"{gridPosition.x},{gridPosition.y}";
+                }
             }
 
             RefreshToken();

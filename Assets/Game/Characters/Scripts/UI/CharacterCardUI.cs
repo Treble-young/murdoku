@@ -38,9 +38,19 @@ namespace Murdoku.Characters
         private Coroutine scaleRoutine;
         private RectTransform genderCircleRect;
         private TMP_Text genderSymbolText;
+        private bool genderToggleEnabled = true;
         private readonly Vector3[] genderCorners = new Vector3[4];
 
         public CharacterData Character => character;
+
+        /// <summary>
+        /// 控制性别切换按钮是否可点击（游玩模式禁用：按钮仍显示 ♂/♀ 供玩家查看，但点击不切换；
+        /// 出题模式启用）。注意：卡片可能是 Rebuild 时动态创建的，调用时机与创建顺序无关（状态持久化）。
+        /// </summary>
+        public void SetGenderToggleEnabled(bool enabled)
+        {
+            genderToggleEnabled = enabled;
+        }
 
         /// <summary>
         /// 重新把角色当前线索同步到卡片线索文本（编辑线索后调用）。
@@ -158,7 +168,8 @@ namespace Murdoku.Characters
 
         private void HandleGenderClicked()
         {
-            if (character == null)
+            // 游玩模式禁用：按钮仍显示性别符号，但点击不切换。
+            if (!genderToggleEnabled || character == null)
             {
                 return;
             }

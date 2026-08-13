@@ -22,7 +22,7 @@ namespace Murdoku.Characters
         [Min(24f)]
         [SerializeField] private float maxCellSize = 128f;
         [Min(0f)]
-        [SerializeField] private float cellSpacing = 8f;
+        [SerializeField] private float cellSpacing = 4f;
         [Min(24f)]
         [SerializeField] private float minCellSize = 40f;
 

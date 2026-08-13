@@ -21,12 +21,26 @@ namespace Murdoku.Characters
     {
         [SerializeField] private CharacterPanelUI selectionSource;
 
+        /// <summary>一步放置/移动操作的撤销/重做记录。</summary>
+        private sealed class PlacementUndoEntry
+        {
+            public CharacterData Character;
+            public ICharacterPlacementCell FromCell; // 操作前所在格子；首次放置为 null（面板）
+            public ICharacterPlacementCell ToCell;   // 操作后所在格子（撤销前的当前位置）
+        }
+
         private readonly Dictionary<CharacterData, ICharacterPlacementCell> placements =
             new Dictionary<CharacterData, ICharacterPlacementCell>();
+        private readonly List<PlacementUndoEntry> undoHistory = new List<PlacementUndoEntry>();
+        private readonly List<PlacementUndoEntry> redoHistory = new List<PlacementUndoEntry>();
 
         public CharacterData SelectedCharacter { get; private set; }
 
         public CharacterPanelUI SelectionSource => selectionSource;
+
+        public int UndoHistoryCount => undoHistory.Count;
+
+        public int RedoHistoryCount => redoHistory.Count;
 
         private void OnEnable()
         {
@@ -111,7 +125,120 @@ namespace Murdoku.Characters
             }
 
             placements[character] = cell;
+
+            // 记录撤销历史：移动记录原格子，首次放置记录 null；新操作清空重做栈。
+            undoHistory.Add(new PlacementUndoEntry
+            {
+                Character = character,
+                FromCell = moved ? currentCell : null,
+                ToCell = cell
+            });
+            redoHistory.Clear();
+
             return moved ? CharacterPlacementResult.Moved : CharacterPlacementResult.Placed;
+        }
+
+        /// <summary>
+        /// 撤销最近一步放置/移动操作（多步可连续撤销）。
+        /// 移动：人物回到原格子；首次放置：人物移除回面板。
+        /// </summary>
+        public bool UndoLastPlacement()
+        {
+            if (undoHistory.Count == 0)
+            {
+                return false;
+            }
+
+            PlacementUndoEntry entry = undoHistory[undoHistory.Count - 1];
+            undoHistory.RemoveAt(undoHistory.Count - 1);
+
+            if (entry.Character == null)
+            {
+                return true;
+            }
+
+            // 从当前位置（ToCell）移除。
+            ICharacterPlacementCell fromAfterUndo = null;
+            if (placements.TryGetValue(entry.Character, out ICharacterPlacementCell currentCell) &&
+                currentCell != null)
+            {
+                currentCell.RemoveCharacter();
+                placements.Remove(entry.Character);
+            }
+
+            // 移动操作：放回原格子（若仍可放置且未被占用）。
+            if (entry.FromCell != null &&
+                entry.FromCell.IsPlaceable && !entry.FromCell.IsOccupied &&
+                entry.FromCell.TryPlaceCharacter(entry.Character))
+            {
+                placements[entry.Character] = entry.FromCell;
+                fromAfterUndo = entry.FromCell;
+            }
+
+            // 记录重做信息：撤销后人物所在位置 + 重做目标（ToCell）。
+            redoHistory.Add(new PlacementUndoEntry
+            {
+                Character = entry.Character,
+                FromCell = fromAfterUndo,
+                ToCell = entry.ToCell
+            });
+
+            return true;
+        }
+
+        /// <summary>
+        /// 恢复（重做）最近一次被撤销的放置/移动操作（多步可连续恢复）。
+        /// </summary>
+        public bool RedoLastPlacement()
+        {
+            if (redoHistory.Count == 0)
+            {
+                return false;
+            }
+
+            PlacementUndoEntry entry = redoHistory[redoHistory.Count - 1];
+            redoHistory.RemoveAt(redoHistory.Count - 1);
+
+            if (entry.Character == null)
+            {
+                return true;
+            }
+
+            // 从当前位置移除。
+            if (placements.TryGetValue(entry.Character, out ICharacterPlacementCell currentCell) &&
+                currentCell != null)
+            {
+                currentCell.RemoveCharacter();
+                placements.Remove(entry.Character);
+            }
+
+            // 放回 ToCell（若仍可放置且未被占用）。
+            bool placed = entry.ToCell != null &&
+                          entry.ToCell.IsPlaceable && !entry.ToCell.IsOccupied &&
+                          entry.ToCell.TryPlaceCharacter(entry.Character);
+            if (placed)
+            {
+                placements[entry.Character] = entry.ToCell;
+            }
+
+            // 记录撤销信息：重做后人物所在位置。
+            undoHistory.Add(new PlacementUndoEntry
+            {
+                Character = entry.Character,
+                FromCell = entry.FromCell,
+                ToCell = placed ? entry.ToCell : null
+            });
+
+            return true;
+        }
+
+        /// <summary>
+        /// 清空撤销与重做历史（载入关卡/重建棋盘时调用）。
+        /// </summary>
+        public void ClearUndoHistory()
+        {
+            undoHistory.Clear();
+            redoHistory.Clear();
         }
 
         /// <summary>

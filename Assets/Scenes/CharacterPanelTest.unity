@@ -2954,7 +2954,7 @@ MonoBehaviour:
   cellPrefab: {fileID: 6425028858448068991, guid: 30b6bbadb2adc4848bb1ffdc1f759864, type: 3}
   blockedPositions: []
   maxCellSize: 128
-  cellSpacing: 8
+  cellSpacing: 4
   minCellSize: 40
 --- !u!1001 &2033222700
 PrefabInstance:

@@ -141,6 +141,24 @@ namespace Murdoku.Characters
             SelectionChanged?.Invoke(null);
         }
 
+        private bool genderToggleEnabled = true;
+
+        /// <summary>
+        /// 批量控制所有嫌疑人卡的性别切换按钮（出题模式启用，游玩模式禁用）。
+        /// 状态持久化：之后 Rebuild 生成的卡片也会应用该状态。
+        /// </summary>
+        public void SetGenderToggleEnabled(bool enabled)
+        {
+            genderToggleEnabled = enabled;
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null)
+                {
+                    card.SetGenderToggleEnabled(enabled);
+                }
+            }
+        }
+
         public void Rebuild()
         {
             ClearCards();
@@ -161,6 +179,7 @@ namespace Murdoku.Characters
                 CharacterCardUI card = Instantiate(cardPrefab, view.CharacterGrid);
                 card.name = $"CharacterCard_{character.DisplayName}";
                 card.Bind(character, HandleCardClicked, HandleCardDragStarted);
+                card.SetGenderToggleEnabled(genderToggleEnabled);
                 cards.Add(card);
             }
         }

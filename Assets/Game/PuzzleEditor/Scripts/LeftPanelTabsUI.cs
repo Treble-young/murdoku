@@ -31,6 +31,11 @@ namespace Murdoku.PuzzleEditor
             {
                 regionsTabButton.onClick.AddListener(() => SelectTab(1));
             }
+
+            // 立即应用初始页签：Awake 早于场景中其他组件的 Start，
+            // 先隐藏 RegionPanel，避免 Coordinator 初始化时把地块卡片创建到可见面板上。
+            EnsurePanelReferences();
+            ApplyTabState(0);
         }
 
         private void OnDestroy()
@@ -48,8 +53,8 @@ namespace Murdoku.PuzzleEditor
 
         private void Start()
         {
-            EnsurePanelReferences();
-            SelectTab(0);
+            // 冗余调用：确保初始页签与按钮高亮始终正确（Awake 阶段引用可能尚未就绪时兜底）。
+            ApplyTabState(0);
         }
 
         /// <summary>
@@ -58,7 +63,11 @@ namespace Murdoku.PuzzleEditor
         public void SelectTab(int index)
         {
             EnsurePanelReferences();
+            ApplyTabState(index);
+        }
 
+        private void ApplyTabState(int index)
+        {
             bool showSuspects = index == 0;
 
             if (suspectsPanel != null)

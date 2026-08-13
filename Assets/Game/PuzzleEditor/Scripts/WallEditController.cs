@@ -538,7 +538,7 @@ namespace Murdoku.PuzzleEditor
                         continue;
                     }
 
-                    cell.SetBackgroundOverride(null);
+                    cell.SetRegionOverlay(null);
                 }
 
                 // 放置模式下已建的墙仍以黑色粗线显示，便于查看区域划分。
@@ -623,6 +623,21 @@ namespace Murdoku.PuzzleEditor
                 return;
             }
 
+            // 区域叠加层只在墙壁模式下显示（辅助区分区域）：
+            // 游玩模式/放置模式下即使载入了墙状态，也要清除叠加层，避免棋盘出现半透明色块。
+            if (mode != EditorMode.EditWalls)
+            {
+                foreach (TestBoardCellUI cell in board.Cells)
+                {
+                    if (cell != null)
+                    {
+                        cell.SetRegionOverlay(null);
+                    }
+                }
+
+                return;
+            }
+
             int[,] regions = walls.ComputeRegions();
             int columns = board.Columns;
             for (int index = 0; index < board.Cells.Count; index++)
@@ -636,7 +651,9 @@ namespace Murdoku.PuzzleEditor
                 int row = index / columns;
                 int col = index % columns;
                 Color regionColor = RegionColors[regions[row, col] % RegionColors.Length];
-                cell.SetBackgroundOverride(regionColor);
+                // 区域色以半透明叠加层呈现：地块图案保留可见，同时辅助区分区域。
+                regionColor.a = 0.35f;
+                cell.SetRegionOverlay(regionColor);
             }
         }
     }
