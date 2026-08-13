@@ -24,7 +24,7 @@ namespace Murdoku.PuzzleEditor
         private const float ContainerHeight = 920f;
         private const float TabBarHeight = 64f;
         private const float BackButtonWidth = 150f;
-        private const float TabButtonWidth = (ContainerWidth - BackButtonWidth) / 2f; // 395
+        private const float TabButtonWidth = (ContainerWidth - BackButtonWidth) / 3f; // ≈263.33（三 Tab 等宽）
 
         [MenuItem("Tools/Murdoku/Build Left Panel Tabs")]
         public static void Build()
@@ -74,6 +74,7 @@ namespace Murdoku.PuzzleEditor
 
             Button suspectsTab = CreateTabButton(tabBar, "SuspectsTab", "嫌疑人", font, TabButtonWidth, BackButtonWidth + TabButtonWidth / 2f);
             Button regionsTab = CreateTabButton(tabBar, "RegionsTab", "地块", font, TabButtonWidth, BackButtonWidth + TabButtonWidth + TabButtonWidth / 2f);
+            Button propsTab = CreateTabButton(tabBar, "PropsTab", "道具", font, TabButtonWidth, BackButtonWidth + TabButtonWidth * 2f + TabButtonWidth / 2f);
 
             // 2.5 返回按钮：移入 TabBar 最左（较窄），保留原有返回功能组件。
             GameObject backButton = GameObject.Find("BackButton");
@@ -116,6 +117,9 @@ namespace Murdoku.PuzzleEditor
             // 4. 地块面板：空白占位（背景 + 提示文字）。
             RectTransform regionsPanel = CreateRegionPanel(container, font);
 
+            // 4.5 道具面板：空白占位（背景 + 提示文字）。
+            RectTransform propsPanel = CreatePropsPanel(container, font);
+
             // 5. 绑定切换脚本。
             LeftPanelTabsUI tabs = container.GetComponent<LeftPanelTabsUI>();
             if (tabs == null)
@@ -125,8 +129,10 @@ namespace Murdoku.PuzzleEditor
 
             SetReference(tabs, "suspectsTabButton", suspectsTab);
             SetReference(tabs, "regionsTabButton", regionsTab);
+            SetReference(tabs, "propsTabButton", propsTab);
             SetReference(tabs, "suspectsPanel", suspectsPanel);
             SetReference(tabs, "regionsPanel", regionsPanel.gameObject);
+            SetReference(tabs, "propsPanel", propsPanel.gameObject);
 
             EditorSceneManager.MarkSceneDirty(scene);
             if (EditorSceneManager.SaveScene(scene))
@@ -299,6 +305,136 @@ namespace Murdoku.PuzzleEditor
             rect.pivot = new Vector2(0.5f, 1f);
             rect.sizeDelta = new Vector2(width, TabBarHeight - 4f);
             rect.anchoredPosition = new Vector2(x, -2f);
+        }
+
+        /// <summary>
+        /// 增量菜单：在已构建的 Tab 栏上添加「道具」页签（第三个 Tab + 空白道具面板）。
+        /// 会把返回/嫌疑人/地块按钮重排为三 Tab 等宽；幂等，可重复运行。
+        /// 适用于场景已构建过左侧 Tab（有未提交修改时推荐用增量而非全量构建）。
+        /// </summary>
+        [MenuItem("Tools/Murdoku/Add Props Tab To Left Panel")]
+        public static void AddPropsTabToLeftPanel()
+        {
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+            RectTransform tabBar = FindRect("TabBar");
+            if (tabBar == null)
+            {
+                Debug.LogWarning("未找到 TabBar，先执行完整构建 Build Left Panel Tabs。");
+                Build();
+                return;
+            }
+
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+            if (font == null)
+            {
+                Debug.LogError($"Add Props Tab: 未找到字体 {FontPath}");
+                return;
+            }
+
+            // 幂等：移除旧的道具 Tab / 道具面板（重复运行菜单时重建）。
+            DestroyChildByName(tabBar, "PropsTab");
+            DestroyChildByName(tabBar.transform.parent as RectTransform, "PropsPanel");
+
+            // 重排：返回 + 三 Tab 等宽。
+            GameObject backButton = GameObject.Find("BackButton");
+            if (backButton != null)
+            {
+                RectTransform backRect = backButton.GetComponent<RectTransform>();
+                Undo.RecordObject(backRect, "Layout BackButton");
+                LayoutTabButton(backRect, BackButtonWidth, BackButtonWidth / 2f);
+            }
+
+            LayoutExistingTab(tabBar, "SuspectsTab", TabButtonWidth, BackButtonWidth + TabButtonWidth / 2f);
+            LayoutExistingTab(tabBar, "RegionsTab", TabButtonWidth, BackButtonWidth + TabButtonWidth + TabButtonWidth / 2f);
+
+            Button propsTab = CreateTabButton(
+                tabBar,
+                "PropsTab",
+                "道具",
+                font,
+                TabButtonWidth,
+                BackButtonWidth + TabButtonWidth * 2f + TabButtonWidth / 2f);
+
+            RectTransform container = tabBar.transform.parent as RectTransform;
+            if (container == null)
+            {
+                Debug.LogError("Add Props Tab: TabBar 的父级不是 RectTransform。");
+                return;
+            }
+
+            RectTransform propsPanel = CreatePropsPanel(container, font);
+
+            LeftPanelTabsUI tabs = container.GetComponent<LeftPanelTabsUI>();
+            if (tabs == null)
+            {
+                tabs = container.gameObject.AddComponent<LeftPanelTabsUI>();
+            }
+
+            SetReference(tabs, "propsTabButton", propsTab);
+            SetReference(tabs, "propsPanel", propsPanel.gameObject);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (EditorSceneManager.SaveScene(scene))
+            {
+                Debug.Log("道具 Tab 已添加并保存。");
+            }
+            else
+            {
+                Debug.LogError("Add Props Tab: 场景保存失败。");
+            }
+        }
+
+        private static void DestroyChildByName(RectTransform root, string name)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            Transform child = root.Find(name);
+            if (child != null)
+            {
+                UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
+        }
+
+        /// <summary>
+        /// 创建空白道具面板占位（背景 + 标题 + 提示）。
+        /// </summary>
+        private static RectTransform CreatePropsPanel(RectTransform parent, TMP_FontAsset font)
+        {
+            RectTransform rect = CreateRect("PropsPanel", parent);
+            FillBelowTabBar(rect, TabBarHeight);
+
+            Image background = rect.gameObject.AddComponent<Image>();
+            background.color = new Color(0.11f, 0.14f, 0.20f, 0.96f);
+            background.raycastTarget = false;
+
+            TMP_Text title = AddText(
+                "TitleText",
+                rect,
+                "道具编辑",
+                36f,
+                Color.white,
+                font,
+                TextAlignmentOptions.Center);
+            Stretch(title.rectTransform);
+            title.rectTransform.anchoredPosition = new Vector2(0f, 80f);
+            title.fontStyle = FontStyles.Bold;
+
+            TMP_Text hint = AddText(
+                "HintText",
+                rect,
+                "（功能开发中…）",
+                24f,
+                new Color(0.62f, 0.70f, 0.82f, 1f),
+                font,
+                TextAlignmentOptions.Center);
+            Stretch(hint.rectTransform);
+            hint.rectTransform.anchoredPosition = new Vector2(0f, 20f);
+
+            return rect;
         }
 
         /// <summary>

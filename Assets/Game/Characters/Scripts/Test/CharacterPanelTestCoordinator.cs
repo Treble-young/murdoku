@@ -28,6 +28,7 @@ namespace Murdoku.Characters
         [SerializeField] private TMP_Text saveHint;
 
         private RegionPanelUI regionPanel;
+        private PropPanelUI propPanel;
 
         private GameObject popupRoot;
         private TMP_Text popupTitleText;
@@ -63,6 +64,7 @@ namespace Murdoku.Characters
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
             EnsureRegionPanel();
+            EnsurePropsPanel();
             ApplyModeVisibility();
             StartCoroutine(LoadSelectedPuzzleRoutine());
         }
@@ -85,6 +87,25 @@ namespace Murdoku.Characters
                 if (cell is TestBoardCellUI cellUI)
                 {
                     cellUI.SetFloorTile(selectedRegion.Index, selectedRegion.Sprite);
+                }
+
+                return;
+            }
+
+            // 道具放置/移除：选中道具卡时点击格子 = 放置道具；同格已是该道具则再点一次移除。
+            PropDefinition selectedProp = propPanel == null ? null : propPanel.SelectedProp;
+            if (selectedProp != null)
+            {
+                if (cell is TestBoardCellUI cellUI)
+                {
+                    if (cellUI.PropIndex == selectedProp.Index)
+                    {
+                        cellUI.SetProp(-1, null);
+                    }
+                    else
+                    {
+                        cellUI.SetProp(selectedProp.Index, selectedProp.Sprite);
+                    }
                 }
 
                 return;
@@ -255,6 +276,13 @@ namespace Murdoku.Characters
                 data.floorTiles[index] = testBoard.Cells[index].FloorTileIndex;
             }
 
+            // 保存格子道具（-1 = 无道具，否则为道具索引）。
+            data.props = new int[size * size];
+            for (int index = 0; index < testBoard.Cells.Count && index < data.props.Length; index++)
+            {
+                data.props[index] = testBoard.Cells[index].PropIndex;
+            }
+
             PuzzleSaveManager.SavePuzzle(data);
             SetSaveHint(string.Empty, false);
             ShowPopup("保存成功", "已保存关卡  " + puzzleName + "  。");
@@ -305,6 +333,7 @@ namespace Murdoku.Characters
 
             // 恢复格子地块（出题时铺的地块图案）。
             RestoreFloorTiles(data);
+            RestoreProps(data);
 
             if (placementController != null && placementController.SelectionSource != null)
             {
@@ -343,6 +372,31 @@ namespace Murdoku.Characters
                 }
 
                 testBoard.Cells[index].SetFloorTile(tileIndex, definitions[tileIndex].Sprite);
+            }
+        }
+
+        /// <summary>
+        /// 把存档中的格子道具恢复显示到棋盘（-1 = 无道具；旧存档无字段自动跳过）。
+        /// </summary>
+        private void RestoreProps(PuzzleData data)
+        {
+            if (testBoard == null || data.props == null || data.props.Length == 0)
+            {
+                return;
+            }
+
+            PropStyleFactory.EnsureSprites();
+            PropDefinition[] definitions = PropStyleFactory.All;
+
+            for (int index = 0; index < testBoard.Cells.Count && index < data.props.Length; index++)
+            {
+                int propIndex = data.props[index];
+                if (propIndex < 0 || propIndex >= definitions.Length)
+                {
+                    continue;
+                }
+
+                testBoard.Cells[index].SetProp(propIndex, definitions[propIndex].Sprite);
             }
         }
 
@@ -668,7 +722,7 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
-        /// 选中地块时取消人物选择（互斥）。
+        /// 选中地块时取消人物/道具选择（互斥）。
         /// </summary>
         private void HandleRegionSelectionChanged(RegionDefinition region)
         {
@@ -682,14 +736,93 @@ namespace Murdoku.Characters
             {
                 panel.ClearSelection();
             }
+
+            if (propPanel != null)
+            {
+                propPanel.ClearSelection();
+            }
         }
 
         /// <summary>
-        /// 选中人物时取消地块选择（互斥）。
+        /// 选中人物时取消地块/道具选择（互斥）。
         /// </summary>
         private void HandleCharacterSelectionChanged(CharacterData character)
         {
-            if (character != null && regionPanel != null)
+            if (character != null)
+            {
+                if (regionPanel != null)
+                {
+                    regionPanel.ClearSelection();
+                }
+
+                if (propPanel != null)
+                {
+                    propPanel.ClearSelection();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 初始化道具面板：在「道具」Tab 的 PropsPanel 上挂载 PropPanelUI 并构建卡片，
+        /// 同时接入「道具选择 ⇄ 人物/地块选择」互斥逻辑。
+        /// 与地块面板一样从 Canvas 递归查找（不受 SetActive(false) 影响）。
+        /// </summary>
+        private void EnsurePropsPanel()
+        {
+            if (propPanel != null)
+            {
+                return;
+            }
+
+            GameObject propObject = null;
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas != null)
+            {
+                RectTransform propRect = FindChildByName<RectTransform>(canvas.transform, "PropsPanel");
+                if (propRect != null)
+                {
+                    propObject = propRect.gameObject;
+                }
+            }
+
+            // 兜底：万一不在 Canvas 层级下。
+            if (propObject == null)
+            {
+                propObject = GameObject.Find("PropsPanel");
+            }
+
+            if (propObject == null)
+            {
+                return;
+            }
+
+            propPanel = propObject.GetComponent<PropPanelUI>();
+            if (propPanel == null)
+            {
+                propPanel = propObject.AddComponent<PropPanelUI>();
+            }
+
+            propPanel.Configure(GetUiFont());
+            propPanel.SelectionChanged += HandlePropSelectionChanged;
+        }
+
+        /// <summary>
+        /// 选中道具时取消人物/地块选择（互斥）。
+        /// </summary>
+        private void HandlePropSelectionChanged(PropDefinition prop)
+        {
+            if (prop == null)
+            {
+                return;
+            }
+
+            CharacterPanelUI panel = placementController == null ? null : placementController.SelectionSource;
+            if (panel != null)
+            {
+                panel.ClearSelection();
+            }
+
+            if (regionPanel != null)
             {
                 regionPanel.ClearSelection();
             }
@@ -1257,6 +1390,20 @@ namespace Murdoku.Characters
                 : FindChildByName<RectTransform>(canvas.transform, "RegionsTab");
             GameObject regionsTabObject = regionsTabRect == null ? null : regionsTabRect.gameObject;
 
+            GameObject propsPanelObject = propPanel != null ? propPanel.gameObject : null;
+            if (propsPanelObject == null)
+            {
+                RectTransform propRect = canvas == null
+                    ? null
+                    : FindChildByName<RectTransform>(canvas.transform, "PropsPanel");
+                propsPanelObject = propRect == null ? null : propRect.gameObject;
+            }
+
+            RectTransform propsTabRect = canvas == null
+                ? null
+                : FindChildByName<RectTransform>(canvas.transform, "PropsTab");
+            GameObject propsTabObject = propsTabRect == null ? null : propsTabRect.gameObject;
+
             if (savePanelObject != null)
             {
                 savePanelObject.SetActive(!playMode);
@@ -1267,20 +1414,30 @@ namespace Murdoku.Characters
                 boardSizePanel.gameObject.SetActive(!playMode);
             }
 
-            // 面板显隐交给 LeftPanelTabsUI 的 Tab 切换管理，这里不再直接 SetActive 地块面板，
-            // 避免覆盖 Tab 切换的初始状态（否则出题模式初始会错误显示地块面板）。
-            // 仅在游玩模式强制切到嫌疑人面板（地块 Tab 不可用）；出题模式保持 Tab 的初始状态（嫌疑人面板）。
+            // 面板显隐交给 LeftPanelTabsUI 的 Tab 切换管理，这里不再直接 SetActive 地块/道具面板，
+            // 避免覆盖 Tab 切换的初始状态（否则出题模式初始会错误显示编辑面板）。
+            // 仅在游玩模式强制切到嫌疑人面板（地块/道具 Tab 不可用）；出题模式保持 Tab 的初始状态（嫌疑人面板）。
             if (playMode)
             {
                 if (regionsPanelObject != null)
                 {
                     regionsPanelObject.SetActive(false);
                 }
+
+                if (propsPanelObject != null)
+                {
+                    propsPanelObject.SetActive(false);
+                }
             }
 
             if (regionsTabObject != null)
             {
                 regionsTabObject.SetActive(!playMode);
+            }
+
+            if (propsTabObject != null)
+            {
+                propsTabObject.SetActive(!playMode);
             }
 
             if (clueButton != null)

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace Murdoku.PuzzleEditor
 {
     /// <summary>
-    /// 左侧面板 Tab 切换：嫌疑人面板 ⇄ 地块面板。
+    /// 左侧面板 Tab 切换：嫌疑人面板 / 地块面板 / 道具面板。
     /// 点击 Tab 按钮切换显示对应面板，并高亮当前 Tab（选中蓝 / 未选灰）。
     /// </summary>
     public sealed class LeftPanelTabsUI : MonoBehaviour
@@ -12,10 +12,12 @@ namespace Murdoku.PuzzleEditor
         [Header("Tab 按钮")]
         [SerializeField] private Button suspectsTabButton;
         [SerializeField] private Button regionsTabButton;
+        [SerializeField] private Button propsTabButton;
 
         [Header("面板")]
         [SerializeField] private GameObject suspectsPanel;
         [SerializeField] private GameObject regionsPanel;
+        [SerializeField] private GameObject propsPanel;
 
         private static readonly Color ActiveColor = new Color(0.22f, 0.48f, 0.86f, 1f);
         private static readonly Color InactiveColor = new Color(0.30f, 0.33f, 0.40f, 1f);
@@ -32,8 +34,13 @@ namespace Murdoku.PuzzleEditor
                 regionsTabButton.onClick.AddListener(() => SelectTab(1));
             }
 
+            if (propsTabButton != null)
+            {
+                propsTabButton.onClick.AddListener(() => SelectTab(2));
+            }
+
             // 立即应用初始页签：Awake 早于场景中其他组件的 Start，
-            // 先隐藏 RegionPanel，避免 Coordinator 初始化时把地块卡片创建到可见面板上。
+            // 先隐藏 RegionPanel/PropsPanel，避免 Coordinator 初始化时把卡片创建到可见面板上。
             EnsurePanelReferences();
             ApplyTabState(0);
         }
@@ -49,6 +56,11 @@ namespace Murdoku.PuzzleEditor
             {
                 regionsTabButton.onClick.RemoveAllListeners();
             }
+
+            if (propsTabButton != null)
+            {
+                propsTabButton.onClick.RemoveAllListeners();
+            }
         }
 
         private void Start()
@@ -58,7 +70,7 @@ namespace Murdoku.PuzzleEditor
         }
 
         /// <summary>
-        /// 切换到指定页签：0 = 嫌疑人，1 = 地块。
+        /// 切换到指定页签：0 = 嫌疑人，1 = 地块，2 = 道具。
         /// </summary>
         public void SelectTab(int index)
         {
@@ -69,6 +81,8 @@ namespace Murdoku.PuzzleEditor
         private void ApplyTabState(int index)
         {
             bool showSuspects = index == 0;
+            bool showRegions = index == 1;
+            bool showProps = index == 2;
 
             if (suspectsPanel != null)
             {
@@ -77,11 +91,17 @@ namespace Murdoku.PuzzleEditor
 
             if (regionsPanel != null)
             {
-                regionsPanel.SetActive(!showSuspects);
+                regionsPanel.SetActive(showRegions);
+            }
+
+            if (propsPanel != null)
+            {
+                propsPanel.SetActive(showProps);
             }
 
             SetButtonColor(suspectsTabButton, showSuspects);
-            SetButtonColor(regionsTabButton, !showSuspects);
+            SetButtonColor(regionsTabButton, showRegions);
+            SetButtonColor(propsTabButton, showProps);
         }
 
         /// <summary>
@@ -98,6 +118,11 @@ namespace Murdoku.PuzzleEditor
             if (regionsPanel == null)
             {
                 regionsPanel = FindChildObject("RegionPanel");
+            }
+
+            if (propsPanel == null)
+            {
+                propsPanel = FindChildObject("PropsPanel");
             }
         }
 

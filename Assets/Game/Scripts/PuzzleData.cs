@@ -39,6 +39,11 @@ namespace Murdoku
         /// </summary>
         public int[] floorTiles;
 
+        /// <summary>
+        /// 格子道具，size × size 展平；-1 表示无道具，否则为 PropStyleFactory.All 的索引。
+        /// </summary>
+        public int[] props;
+
         public List<PuzzlePlacementData> placements = new List<PuzzlePlacementData>();
         public List<PuzzleClueData> clues = new List<PuzzleClueData>();
     }

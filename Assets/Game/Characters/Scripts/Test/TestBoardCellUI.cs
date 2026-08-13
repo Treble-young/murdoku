@@ -37,11 +37,13 @@ namespace Murdoku.Characters
         private Color? floorColor;
         private Sprite floorSprite;
         private int floorTileIndex = -1;
+        private int propIndex = -1;
         private bool interactionEnabled = true;
         private CanvasGroup interactionGroup;
         private Image rowColumnHighlight;
         private Image errorHighlight;
         private Image regionOverlay;
+        private Image propImage;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
@@ -78,6 +80,7 @@ namespace Murdoku.Characters
             floorColor = null;
             floorSprite = null;
             floorTileIndex = -1;
+            propIndex = -1;
             Refresh();
         }
 
@@ -127,6 +130,51 @@ namespace Murdoku.Characters
 
         /// <summary>当前地块样式索引（-1 = 无地块），用于保存关卡。</summary>
         public int FloorTileIndex => floorTileIndex;
+
+        /// <summary>
+        /// 设置格子的道具（propIndex &lt; 0 表示清除）。
+        /// 道具渲染在地块之上、棋子之下（图层叠放），不占格、不阻挡人物放置。
+        /// </summary>
+        public void SetProp(int propIndex, Sprite icon)
+        {
+            this.propIndex = propIndex;
+            if (propIndex >= 0 && propImage == null)
+            {
+                // 创建道具层：背景（index 0）之上、棋子之下。
+                GameObject overlay = new GameObject(
+                    "PropOverlay",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                overlay.layer = LayerMask.NameToLayer("UI");
+                RectTransform rect = overlay.GetComponent<RectTransform>();
+                rect.SetParent(transform, false);
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                rect.SetSiblingIndex(1);
+
+                propImage = overlay.GetComponent<Image>();
+                propImage.raycastTarget = false;
+            }
+
+            if (propImage != null)
+            {
+                bool hasProp = propIndex >= 0;
+                propImage.gameObject.SetActive(hasProp);
+                if (hasProp)
+                {
+                    propImage.sprite = icon;
+                    propImage.color = Color.white;
+                }
+            }
+
+            Refresh();
+        }
+
+        /// <summary>当前道具索引（-1 = 无道具），用于保存关卡。</summary>
+        public int PropIndex => propIndex;
 
         /// <summary>
         /// 设置区域区分叠加层（半透明，叠加在地块图案上方辅助区分区域，不覆盖地块）；
@@ -333,9 +381,10 @@ namespace Murdoku.Characters
 
             if (coordinateText != null)
             {
-                // 有地块（图案/颜色）时隐藏坐标文字，避免文字叠加在图案上造成"色差"；
-                // 无地块时仍显示坐标（测试/编辑辅助）。
-                bool hasFloor = floorSprite != null || floorColor.HasValue || backgroundOverride.HasValue;
+                // 有地块（图案/颜色）或道具时隐藏坐标文字，避免文字叠加在图案上造成"色差"；
+                // 无地块无道具时仍显示坐标（测试/编辑辅助）。
+                bool hasFloor = floorSprite != null || floorColor.HasValue || backgroundOverride.HasValue
+                    || propIndex >= 0;
                 coordinateText.gameObject.SetActive(!hasFloor);
                 if (!hasFloor)
                 {
