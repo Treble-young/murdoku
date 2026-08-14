@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Murdoku.Audio;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
@@ -13,10 +16,22 @@ namespace Murdoku.Characters
         private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
         private CharacterCardUI selectedCard;
         private TestBoardController board;
+        private GameObject blackXCard;
+        private GameObject blackXBorder;
+        private bool blackXActive;
+        private Coroutine blackXScaleRoutine;
+        private const float BlackXSelectedScale = 1.1f;
+        private const float BlackXScaleDuration = 0.1f;
 
         public event Action<CharacterData> SelectionChanged;
 
+        /// <summary>黑叉模式切换事件（true = 禁止放置模式激活）。</summary>
+        public event Action<bool> BlackXModeChanged;
+
         public CharacterData SelectedCharacter => selectedCard == null ? null : selectedCard.Character;
+
+        /// <summary>是否处于「禁止放置」打叉模式。</summary>
+        public bool BlackXActive => blackXActive;
 
         public IReadOnlyList<CharacterData> Characters => characters;
 
@@ -46,6 +61,12 @@ namespace Murdoku.Characters
 
                     if (string.Equals(character.CharacterId, clue.characterId, StringComparison.OrdinalIgnoreCase))
                     {
+                        // 恢复出题人设定的名字（旧存档无名字字段则保持随机名）。
+                        if (!string.IsNullOrWhiteSpace(clue.name))
+                        {
+                            character.SetDisplayName(clue.name);
+                        }
+
                         character.SetClue(clue.clue);
                         break;
                     }
@@ -53,6 +74,18 @@ namespace Murdoku.Characters
             }
 
             RefreshAllClues();
+            RefreshAllNames();
+        }
+
+        public void RefreshAllNames()
+        {
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null)
+                {
+                    card.RefreshName();
+                }
+            }
         }
 
         public void RefreshAllClues()
@@ -182,6 +215,237 @@ namespace Murdoku.Characters
                 card.SetGenderToggleEnabled(genderToggleEnabled);
                 cards.Add(card);
             }
+
+            CreateBlackXCard();
+        }
+
+        /// <summary>
+        /// 在网格末尾创建「禁止放置」黑叉卡，结构与嫌疑人卡一致：
+        /// 图案（黑色 ×，上部）+ 名字（禁用标记）+ 线索文本（默认提示，底部）+ 蓝色细边框（选中时显示）。
+        /// 出题模式：标记禁放格（保存为规则）；游玩模式：玩家标记已排除区域（不保存）。
+        /// </summary>
+        private void CreateBlackXCard()
+        {
+            if (view == null || view.CharacterGrid == null)
+            {
+                return;
+            }
+
+            TMP_FontAsset font = FindFirstObjectByType<TextMeshProUGUI>().font;
+            Color darkText = new Color(0.16f, 0.20f, 0.26f, 1f);
+
+            blackXCard = new GameObject("BlackXCard", typeof(RectTransform), typeof(Image));
+            blackXCard.layer = LayerMask.NameToLayer("UI");
+            RectTransform root = blackXCard.GetComponent<RectTransform>();
+            root.SetParent(view.CharacterGrid, false);
+
+            Image background = blackXCard.GetComponent<Image>();
+            background.color = Color.white;
+            background.raycastTarget = true;
+
+            // 选中边框：4 条蓝色细边（与嫌疑人卡一致），激活时显示。
+            blackXBorder = new GameObject("SelectionBorder", typeof(RectTransform));
+            blackXBorder.layer = LayerMask.NameToLayer("UI");
+            RectTransform borderRect = blackXBorder.GetComponent<RectTransform>();
+            borderRect.SetParent(root, false);
+            Stretch(borderRect);
+
+            Color borderColor = new Color(0.22f, 0.48f, 0.86f, 1f);
+            CreateBorderBar(borderRect, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 6f), new Vector2(0f, -3f), borderColor);
+            CreateBorderBar(borderRect, "BottomBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 6f), new Vector2(0f, 3f), borderColor);
+            CreateBorderBar(borderRect, "LeftBar", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(6f, 0f), new Vector2(3f, 0f), borderColor);
+            CreateBorderBar(borderRect, "RightBar", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(6f, 0f), new Vector2(-3f, 0f), borderColor);
+            blackXBorder.SetActive(false);
+
+            // 图案底图：浅灰色方形（与嫌疑人卡的头像区一致，保证卡面统一）。
+            RectTransform markBg = CreateCardRect("MarkBg", root, 124f, 128f);
+            markBg.anchorMin = new Vector2(0.5f, 1f);
+            markBg.anchorMax = new Vector2(0.5f, 1f);
+            markBg.pivot = new Vector2(0.5f, 1f);
+            markBg.anchoredPosition = new Vector2(0f, -22f);
+            Image markBgImage = markBg.gameObject.AddComponent<Image>();
+            markBgImage.color = new Color(0.90f, 0.91f, 0.93f, 1f);
+            markBgImage.raycastTarget = false;
+
+            // 图案：黑色大 ×（浅灰底图内）。
+            TMP_Text mark = CreateCardText("Mark", markBg, "×", font, 95f, Color.black);
+            Stretch(mark.rectTransform);
+            mark.rectTransform.anchoredPosition = new Vector2(0f, 8f);
+            mark.fontStyle = FontStyles.Bold;
+
+            // 名字：禁用标记（与嫌疑人卡名字同位置/字号：锚顶部 y-148、25 号）。
+            TMP_Text nameText = CreateCardText("NameText", root, "禁用标记", font, 25f, darkText);
+            RectTransform nameRect = nameText.rectTransform;
+            nameRect.anchorMin = new Vector2(0.5f, 1f);
+            nameRect.anchorMax = new Vector2(0.5f, 1f);
+            nameRect.pivot = new Vector2(0.5f, 1f);
+            nameRect.sizeDelta = new Vector2(145f, 38f);
+            nameRect.anchoredPosition = new Vector2(0f, -148f);
+            nameText.fontStyle = FontStyles.Bold;
+
+            // 线索文本：默认提示（名字下方居中区域，自动换行，不贴卡片底部）。
+            TMP_Text clueText = CreateCardText("ClueText", root, "这是用于排除或禁止放置的标记", font, 20f, new Color(0.40f, 0.44f, 0.52f, 1f));
+            RectTransform clueRect = clueText.rectTransform;
+            clueRect.anchorMin = new Vector2(0.5f, 0f);
+            clueRect.anchorMax = new Vector2(0.5f, 0f);
+            clueRect.pivot = new Vector2(0.5f, 0.5f);
+            clueRect.sizeDelta = new Vector2(148f, 56f);
+            clueRect.anchoredPosition = new Vector2(0f, 62f);
+            clueText.alignment = TextAlignmentOptions.Center;
+            clueText.textWrappingMode = TextWrappingModes.Normal;
+
+            BlackXCardHandler handler = blackXCard.AddComponent<BlackXCardHandler>();
+            handler.Clicked = ToggleBlackX;
+        }
+
+        /// <summary>创建选中边框的一条边（细条 Image）。</summary>
+        private static void CreateBorderBar(
+            RectTransform parent,
+            string barName,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 sizeDelta,
+            Vector2 anchoredPosition,
+            Color color)
+        {
+            GameObject bar = new GameObject(barName, typeof(RectTransform), typeof(Image));
+            bar.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = (RectTransform)bar.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = Vector2.one * 0.5f;
+            rect.sizeDelta = sizeDelta;
+            rect.anchoredPosition = anchoredPosition;
+
+            Image image = bar.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        /// <summary>创建指定尺寸的矩形（锚点/位置由调用方设置）。</summary>
+        private static RectTransform CreateCardRect(string name, RectTransform parent, float width, float height)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(width, height);
+            return rect;
+        }
+
+        private static TMP_Text CreateCardText(
+            string name,
+            RectTransform parent,
+            string content,
+            TMP_FontAsset font,
+            float fontSize,
+            Color color)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            go.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+
+            TMP_Text text = go.GetComponent<TextMeshProUGUI>();
+            text.font = font;
+            text.fontSize = fontSize;
+            text.color = color;
+            text.alignment = TextAlignmentOptions.Center;
+            text.text = content;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>
+        /// 切换黑叉模式（点黑叉卡：激活/取消）。
+        /// </summary>
+        public void ToggleBlackX()
+        {
+            GameAudio.Play(SfxCue.UiClick);
+            SetBlackXActive(!blackXActive);
+        }
+
+        /// <summary>
+        /// 设置黑叉模式：激活时取消角色选择（互斥），通知协调器。
+        /// </summary>
+        public void SetBlackXActive(bool active)
+        {
+            if (blackXActive == active)
+            {
+                return;
+            }
+
+            blackXActive = active;
+            if (blackXActive && selectedCard != null)
+            {
+                selectedCard.SetSelected(false);
+                selectedCard = null;
+            }
+
+            RefreshBlackXCard();
+            SelectionChanged?.Invoke(null);
+            BlackXModeChanged?.Invoke(blackXActive);
+        }
+
+        private void RefreshBlackXCard()
+        {
+            if (blackXBorder != null)
+            {
+                blackXBorder.SetActive(blackXActive);
+            }
+
+            // 选中时略微放大（与嫌疑人卡一致）。
+            AnimateBlackXScale(blackXActive ? BlackXSelectedScale : 1f);
+        }
+
+        private void AnimateBlackXScale(float targetScale)
+        {
+            if (blackXCard == null)
+            {
+                return;
+            }
+
+            if (blackXScaleRoutine != null)
+            {
+                StopCoroutine(blackXScaleRoutine);
+                blackXScaleRoutine = null;
+            }
+
+            if (!Application.isPlaying || !isActiveAndEnabled)
+            {
+                blackXCard.transform.localScale = Vector3.one * targetScale;
+                return;
+            }
+
+            blackXScaleRoutine = StartCoroutine(AnimateBlackXScaleRoutine(targetScale));
+        }
+
+        private System.Collections.IEnumerator AnimateBlackXScaleRoutine(float targetScale)
+        {
+            Vector3 startScale = blackXCard.transform.localScale;
+            Vector3 endScale = Vector3.one * targetScale;
+            float elapsed = 0f;
+
+            while (elapsed < BlackXScaleDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / BlackXScaleDuration);
+                blackXCard.transform.localScale = Vector3.Lerp(startScale, endScale, t);
+                yield return null;
+            }
+
+            blackXCard.transform.localScale = endScale;
+            blackXScaleRoutine = null;
         }
 
         private void HandleCardClicked(CharacterCardUI card)
@@ -212,6 +476,12 @@ namespace Murdoku.Characters
 
         private void SelectCard(CharacterCardUI card)
         {
+            // 选中角色时退出黑叉模式（互斥）。
+            if (blackXActive)
+            {
+                SetBlackXActive(false);
+            }
+
             if (selectedCard != null)
             {
                 selectedCard.SetSelected(false);
@@ -224,6 +494,19 @@ namespace Murdoku.Characters
 
         private void ClearCards()
         {
+            if (blackXActive)
+            {
+                blackXActive = false;
+                BlackXModeChanged?.Invoke(false);
+            }
+
+            if (blackXCard != null)
+            {
+                Destroy(blackXCard);
+                blackXCard = null;
+                blackXBorder = null;
+            }
+
             if (selectedCard != null)
             {
                 selectedCard = null;

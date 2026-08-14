@@ -63,6 +63,17 @@ namespace Murdoku.Characters
             }
         }
 
+        /// <summary>
+        /// 重新把角色当前名字同步到卡片名字文本（载入关卡恢复名字后调用）。
+        /// </summary>
+        public void RefreshName()
+        {
+            if (nameText != null)
+            {
+                nameText.text = character == null ? string.Empty : character.DisplayName;
+            }
+        }
+
         private void Awake()
         {
             if (button != null)

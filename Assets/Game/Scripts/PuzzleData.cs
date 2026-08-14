@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Murdoku
 {
@@ -19,6 +20,9 @@ namespace Murdoku
     {
         public string characterId;
         public string clue;
+
+        /// <summary>角色显示名（出题时设定的名字，游玩模式载入时恢复；旧存档无此字段自动跳过）。</summary>
+        public string name;
     }
 
     [Serializable]
@@ -43,6 +47,22 @@ namespace Murdoku
         /// 格子道具，size × size 展平；-1 表示无道具，否则为 PropStyleFactory.All 的索引。
         /// </summary>
         public int[] props;
+
+        /// <summary>
+        /// 出题人禁放格（size × size 展平，true = 禁止放置人物，如冰箱/桌子占位）。
+        /// 游玩模式隐形生效（不显示黑叉，但格子拒绝放置）。
+        /// </summary>
+        public bool[] forbiddenCells;
+
+        /// <summary>
+        /// 区域名字（按墙计算出的区域 id 索引；空字符串 = 未命名）。旧存档无字段自动兼容。
+        /// </summary>
+        public List<string> regionNames = new List<string>();
+
+        /// <summary>
+        /// 区域名字文字偏移（按区域 id 索引，相对几何中心的像素偏移）。旧存档无字段自动兼容。
+        /// </summary>
+        public List<Vector2> regionNameOffsets = new List<Vector2>();
 
         public List<PuzzlePlacementData> placements = new List<PuzzlePlacementData>();
         public List<PuzzleClueData> clues = new List<PuzzleClueData>();

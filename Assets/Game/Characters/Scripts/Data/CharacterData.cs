@@ -34,6 +34,14 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
+        /// 运行时设置显示名（载入关卡时恢复出题人设定的名字，避免游玩模式重新随机）。
+        /// </summary>
+        public void SetDisplayName(string name)
+        {
+            displayName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        }
+
+        /// <summary>
         /// 运行时创建嫌疑人/受害者数据（不保存为 asset，用于出题器按棋盘大小动态生成）。
         /// </summary>
         public static CharacterData CreateRuntime(

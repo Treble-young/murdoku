@@ -38,11 +38,19 @@ namespace Murdoku.Characters
         private Button submitButton;
         private Button undoButton;
         private Button redoButton;
+        private Button regionNameButton;
         private GameObject cluePanelRoot;
         private RectTransform clueContentRect;
         private readonly List<GameObject> clueRows = new List<GameObject>();
         private readonly List<TMP_InputField> clueInputs = new List<TMP_InputField>();
         private readonly List<CharacterData> clueInputCharacters = new List<CharacterData>();
+        private GameObject regionNamePanelRoot;
+        private RectTransform regionNameContentRect;
+        private readonly List<GameObject> regionNameRows = new List<GameObject>();
+        private readonly List<TMP_InputField> regionNameInputs = new List<TMP_InputField>();
+        private readonly List<TMP_InputField> regionNameInputXs = new List<TMP_InputField>();
+        private readonly List<TMP_InputField> regionNameInputYs = new List<TMP_InputField>();
+        private readonly List<int> regionNameIds = new List<int>();
         private bool playMode;
         private List<PuzzlePlacementData> solutionPlacements;
 
@@ -106,6 +114,26 @@ namespace Murdoku.Characters
                     else
                     {
                         cellUI.SetProp(selectedProp.Index, selectedProp.Sprite);
+                    }
+                }
+
+                return;
+            }
+
+            // 禁止放置（黑叉）：出题模式标记禁放格（保存规则、显示黑叉）；
+            // 游玩模式玩家标记已排除区域（显示黑叉、不保存）。再点一次取消。
+            CharacterPanelUI characterPanel = placementController == null ? null : placementController.SelectionSource;
+            if (characterPanel != null && characterPanel.BlackXActive)
+            {
+                if (cell is TestBoardCellUI cellUI)
+                {
+                    if (playMode)
+                    {
+                        cellUI.TogglePlayerMark();
+                    }
+                    else
+                    {
+                        cellUI.SetEditorForbidden(!cellUI.EditorForbidden, true);
                     }
                 }
 
@@ -251,6 +279,13 @@ namespace Murdoku.Characters
                 }
             }
 
+            // 保存区域名字（按区域 id 索引）与名字文字偏移。
+            if (wallEditController != null)
+            {
+                data.regionNames = new List<string>(wallEditController.RegionNames);
+                data.regionNameOffsets = new List<Vector2>(wallEditController.RegionNameOffsets);
+            }
+
             CharacterPanelUI panel = placementController == null ? null : placementController.SelectionSource;
             if (panel != null)
             {
@@ -265,7 +300,8 @@ namespace Murdoku.Characters
                     data.clues.Add(new PuzzleClueData
                     {
                         characterId = character.CharacterId,
-                        clue = character.Clue ?? string.Empty
+                        clue = character.Clue ?? string.Empty,
+                        name = character.DisplayName
                     });
                 }
             }
@@ -282,6 +318,13 @@ namespace Murdoku.Characters
             for (int index = 0; index < testBoard.Cells.Count && index < data.props.Length; index++)
             {
                 data.props[index] = testBoard.Cells[index].PropIndex;
+            }
+
+            // 保存出题人禁放格（true = 禁止放置人物）。
+            data.forbiddenCells = new bool[size * size];
+            for (int index = 0; index < testBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
+            {
+                data.forbiddenCells[index] = testBoard.Cells[index].EditorForbidden;
             }
 
             PuzzleSaveManager.SavePuzzle(data);
@@ -330,11 +373,15 @@ namespace Murdoku.Characters
             if (wallEditController != null)
             {
                 wallEditController.ClearPendingWallState();
+                // 恢复区域名字与文字偏移（旧存档无字段自动跳过）。
+                wallEditController.ApplyRegionNames(data.regionNames);
+                wallEditController.ApplyRegionNameOffsets(data.regionNameOffsets);
             }
 
             // 恢复格子地块（出题时铺的地块图案）。
             RestoreFloorTiles(data);
             RestoreProps(data);
+            RestoreForbiddenCells(data);
 
             if (placementController != null && placementController.SelectionSource != null)
             {
@@ -398,6 +445,26 @@ namespace Murdoku.Characters
                 }
 
                 testBoard.Cells[index].SetProp(propIndex, definitions[propIndex].Sprite);
+            }
+        }
+
+        /// <summary>
+        /// 恢复出题人禁放格（游玩模式隐形生效：格子拒绝放置，但不显示黑叉，避免剧透）。
+        /// 旧存档无字段自动跳过。
+        /// </summary>
+        private void RestoreForbiddenCells(PuzzleData data)
+        {
+            if (testBoard == null || data.forbiddenCells == null || data.forbiddenCells.Length == 0)
+            {
+                return;
+            }
+
+            for (int index = 0; index < testBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
+            {
+                if (data.forbiddenCells[index])
+                {
+                    testBoard.Cells[index].SetEditorForbidden(true, false);
+                }
             }
         }
 
@@ -566,6 +633,14 @@ namespace Murdoku.Characters
                     clueButton.onClick.AddListener(OpenClueEditor);
                 }
 
+                // 区域命名按钮：编辑线索旁边（右侧），出题模式显示（与游玩模式的提交按钮同位置，靠模式显隐切换）。
+                if (regionNameButton == null)
+                {
+                    regionNameButton = CreateHeaderButton(header, "RegionNameButton", "区域命名",
+                        new Vector2(0.5f, 0.46f), new Vector2(1f, 1f));
+                    regionNameButton.onClick.AddListener(OpenRegionNameEditor);
+                }
+
                 // 游玩模式按钮区（恢复/撤销/提交）：恢复在撤销左边。
                 if (redoButton == null)
                 {
@@ -719,11 +794,33 @@ namespace Murdoku.Characters
             if (panel != null)
             {
                 panel.SelectionChanged += HandleCharacterSelectionChanged;
+                panel.BlackXModeChanged += HandleBlackXModeChanged;
             }
         }
 
         /// <summary>
-        /// 选中地块时取消人物/道具选择（互斥）。
+        /// 黑叉模式激活时取消地块/道具选择（互斥）。
+        /// </summary>
+        private void HandleBlackXModeChanged(bool active)
+        {
+            if (!active)
+            {
+                return;
+            }
+
+            if (regionPanel != null)
+            {
+                regionPanel.ClearSelection();
+            }
+
+            if (propPanel != null)
+            {
+                propPanel.ClearSelection();
+            }
+        }
+
+        /// <summary>
+        /// 选中地块时取消人物/道具/黑叉选择（互斥）。
         /// </summary>
         private void HandleRegionSelectionChanged(RegionDefinition region)
         {
@@ -736,6 +833,7 @@ namespace Murdoku.Characters
             if (panel != null)
             {
                 panel.ClearSelection();
+                panel.SetBlackXActive(false);
             }
 
             if (propPanel != null)
@@ -808,7 +906,7 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
-        /// 选中道具时取消人物/地块选择（互斥）。
+        /// 选中道具时取消人物/地块/黑叉选择（互斥）。
         /// </summary>
         private void HandlePropSelectionChanged(PropDefinition prop)
         {
@@ -821,6 +919,7 @@ namespace Murdoku.Characters
             if (panel != null)
             {
                 panel.ClearSelection();
+                panel.SetBlackXActive(false);
             }
 
             if (regionPanel != null)
@@ -1124,6 +1223,244 @@ namespace Murdoku.Characters
             if (cluePanelRoot != null)
             {
                 cluePanelRoot.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// 打开区域命名面板：列出棋盘当前所有区域，逐个输入名字（交互方式与线索编辑一致）。
+        /// </summary>
+        private void OpenRegionNameEditor()
+        {
+            if (wallEditController == null || wallEditController.Walls == null)
+            {
+                SetStatus("墙壁控制器不可用，无法编辑区域命名。", true);
+                return;
+            }
+
+            if (regionNamePanelRoot == null)
+            {
+                BuildRegionNamePanel();
+            }
+
+            if (regionNamePanelRoot == null)
+            {
+                SetStatus("无法创建区域命名窗口，请检查 Canvas 配置。", true);
+                return;
+            }
+
+            RebuildRegionNameRows();
+            regionNamePanelRoot.SetActive(true);
+        }
+
+        private void BuildRegionNamePanel()
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            TMP_FontAsset font = GetUiFont();
+            if (canvas == null || font == null)
+            {
+                return;
+            }
+
+            RectTransform root = CreateUiObject("RegionNamePanelRoot", canvas.transform).GetComponent<RectTransform>();
+            regionNamePanelRoot = root.gameObject;
+            Image mask = root.gameObject.AddComponent<Image>();
+            mask.color = new Color(0f, 0f, 0f, 0.6f);
+            Stretch(root);
+
+            RectTransform panel = CreateUiObject("Panel", root).GetComponent<RectTransform>();
+            panel.anchorMin = new Vector2(0.5f, 0.5f);
+            panel.anchorMax = new Vector2(0.5f, 0.5f);
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            panel.sizeDelta = new Vector2(760f, 760f);
+            panel.anchoredPosition = Vector2.zero;
+            Image panelImage = panel.gameObject.AddComponent<Image>();
+            panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.99f);
+
+            TMP_Text title = CreateText("TitleText", panel, font, 28f, FontStyles.Bold);
+            title.text = "区域命名";
+            RectTransform titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(0f, 56f);
+            titleRect.anchoredPosition = new Vector2(0f, -12f);
+
+            regionNameContentRect = CreateUiObject("Content", panel).GetComponent<RectTransform>();
+            regionNameContentRect.anchorMin = new Vector2(0f, 0f);
+            regionNameContentRect.anchorMax = new Vector2(1f, 1f);
+            regionNameContentRect.offsetMin = new Vector2(20f, 84f);
+            regionNameContentRect.offsetMax = new Vector2(-20f, -70f);
+
+            RectTransform applyRect = CreateUiObject("ApplyButton", panel).GetComponent<RectTransform>();
+            applyRect.anchorMin = new Vector2(0.5f, 0f);
+            applyRect.anchorMax = new Vector2(0.5f, 0f);
+            applyRect.pivot = new Vector2(0.5f, 0.5f);
+            applyRect.sizeDelta = new Vector2(150f, 48f);
+            applyRect.anchoredPosition = new Vector2(-90f, 24f);
+            MakeButton(applyRect, "应用", font, ApplyRegionNameEdits);
+
+            RectTransform cancelRect = CreateUiObject("CancelButton", panel).GetComponent<RectTransform>();
+            cancelRect.anchorMin = new Vector2(0.5f, 0f);
+            cancelRect.anchorMax = new Vector2(0.5f, 0f);
+            cancelRect.pivot = new Vector2(0.5f, 0.5f);
+            cancelRect.sizeDelta = new Vector2(150f, 48f);
+            cancelRect.anchoredPosition = new Vector2(90f, 24f);
+            MakeButton(cancelRect, "取消", font, CloseRegionNamePanel);
+        }
+
+        private void RebuildRegionNameRows()
+        {
+            foreach (GameObject row in regionNameRows)
+            {
+                if (row != null)
+                {
+                    Destroy(row);
+                }
+            }
+
+            regionNameRows.Clear();
+            regionNameInputs.Clear();
+            regionNameInputXs.Clear();
+            regionNameInputYs.Clear();
+            regionNameIds.Clear();
+
+            if (regionNameContentRect == null || wallEditController == null || wallEditController.Walls == null)
+            {
+                return;
+            }
+
+            TMP_FontAsset font = GetUiFont();
+            int[,] regions = wallEditController.Walls.ComputeRegions();
+            int size = wallEditController.Walls.Size;
+            int regionCount = 0;
+            for (int row = 0; row < size; row++)
+            {
+                for (int col = 0; col < size; col++)
+                {
+                    if (regions[row, col] >= regionCount)
+                    {
+                        regionCount = regions[row, col] + 1;
+                    }
+                }
+            }
+
+            for (int regionId = 0; regionId < regionCount; regionId++)
+            {
+                RectTransform rowRect = CreateUiObject("RegionNameRow", regionNameContentRect).GetComponent<RectTransform>();
+                regionNameRows.Add(rowRect.gameObject);
+                rowRect.anchorMin = new Vector2(0.5f, 1f);
+                rowRect.anchorMax = new Vector2(0.5f, 1f);
+                rowRect.pivot = new Vector2(0.5f, 1f);
+                rowRect.anchoredPosition = new Vector2(0f, -12f - regionId * 64f);
+                rowRect.sizeDelta = new Vector2(720f, 56f);
+
+                TMP_Text label = CreateText("Label", rowRect, font, 18f, FontStyles.Bold);
+                label.text = "区域 " + (regionId + 1);
+                label.alignment = TextAlignmentOptions.MidlineLeft;
+                LayoutInRow(label.rectTransform, 4f, 80f, 40f);
+
+                // 名字输入框（左 88 ~ 右 520，与右侧 X/Y 区不重叠）。
+                TMP_InputField input = CreateClueInput(rowRect, font, 12);
+                LayoutInRow(input.GetComponent<RectTransform>(), 88f, 520f, 44f);
+                input.text = regionId < wallEditController.RegionNames.Count
+                    ? wallEditController.RegionNames[regionId] ?? string.Empty
+                    : string.Empty;
+                regionNameInputs.Add(input);
+                regionNameIds.Add(regionId);
+
+                // X 偏移输入框（标签 + 数字框）。
+                TMP_Text xLabel = CreateText("XLabel", rowRect, font, 16f, FontStyles.Normal);
+                xLabel.text = "X";
+                xLabel.alignment = TextAlignmentOptions.MidlineLeft;
+                LayoutInRow(xLabel.rectTransform, 528f, 552f, 40f);
+
+                TMP_InputField inputX = CreateNumberInput(rowRect, font);
+                LayoutInRow(inputX.GetComponent<RectTransform>(), 556f, 630f, 44f);
+
+                // Y 偏移输入框（标签 + 数字框）。
+                TMP_Text yLabel = CreateText("YLabel", rowRect, font, 16f, FontStyles.Normal);
+                yLabel.text = "Y";
+                yLabel.alignment = TextAlignmentOptions.MidlineLeft;
+                LayoutInRow(yLabel.rectTransform, 636f, 660f, 40f);
+
+                TMP_InputField inputY = CreateNumberInput(rowRect, font);
+                LayoutInRow(inputY.GetComponent<RectTransform>(), 664f, 716f, 44f);
+
+                Vector2 offset = regionId < wallEditController.RegionNameOffsets.Count
+                    ? wallEditController.RegionNameOffsets[regionId]
+                    : Vector2.zero;
+                inputX.text = offset.x.ToString("0");
+                inputY.text = offset.y.ToString("0");
+                regionNameInputXs.Add(inputX);
+                regionNameInputYs.Add(inputY);
+            }
+        }
+
+        /// <summary>创建允许输入负数与小数的数字输入框。</summary>
+        private TMP_InputField CreateNumberInput(RectTransform parent, TMP_FontAsset font)
+        {
+            TMP_InputField input = CreateClueInput(parent, font, 8);
+            input.contentType = TMP_InputField.ContentType.DecimalNumber;
+            input.text = "0";
+            return input;
+        }
+
+        /// <summary>
+        /// 在行内布局一个元素：锚点统一为行左边缘垂直居中，
+        /// 用 offsetMin/offsetMax 精确指定左右边界与高度（杜绝元素重叠）。
+        /// </summary>
+        private static void LayoutInRow(RectTransform rect, float left, float right, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.offsetMin = new Vector2(left, -height * 0.5f);
+            rect.offsetMax = new Vector2(right, height * 0.5f);
+        }
+
+        private void ApplyRegionNameEdits()
+        {
+            if (wallEditController == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < regionNameInputs.Count && index < regionNameIds.Count; index++)
+            {
+                TMP_InputField input = regionNameInputs[index];
+                if (input == null)
+                {
+                    continue;
+                }
+
+                int regionId = regionNameIds[index];
+                wallEditController.SetRegionName(regionId, input.text.Trim());
+
+                float x = 0f;
+                float y = 0f;
+                if (index < regionNameInputXs.Count && regionNameInputXs[index] != null)
+                {
+                    float.TryParse(regionNameInputXs[index].text, out x);
+                }
+
+                if (index < regionNameInputYs.Count && regionNameInputYs[index] != null)
+                {
+                    float.TryParse(regionNameInputYs[index].text, out y);
+                }
+
+                wallEditController.SetRegionNameOffset(regionId, new Vector2(x, y));
+            }
+
+            CloseRegionNamePanel();
+            SetStatus("区域名字已更新，保存关卡时会一起存入存档。", false);
+        }
+
+        private void CloseRegionNamePanel()
+        {
+            if (regionNamePanelRoot != null)
+            {
+                regionNamePanelRoot.SetActive(false);
             }
         }
 
@@ -1445,6 +1782,11 @@ namespace Murdoku.Characters
             if (clueButton != null)
             {
                 clueButton.gameObject.SetActive(!playMode);
+            }
+
+            if (regionNameButton != null)
+            {
+                regionNameButton.gameObject.SetActive(!playMode);
             }
 
             if (submitButton != null)

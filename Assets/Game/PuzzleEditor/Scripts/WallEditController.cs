@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Murdoku.Audio;
 using Murdoku.Characters;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -54,6 +55,11 @@ namespace Murdoku.PuzzleEditor
         private int currentSize;
         private RectTransform overlayRoot;
 
+        // 区域命名：名字数据（按区域 id 索引）、名字标签（名字由协调器的「区域命名」面板编辑）。
+        private readonly List<string> regionNames = new List<string>();
+        private readonly List<Vector2> regionNameOffsets = new List<Vector2>();
+        private readonly List<GameObject> regionLabels = new List<GameObject>();
+
         private bool[] pendingHorizontalWalls;
         private bool[] pendingVerticalWalls;
         private bool hasPendingWallState;
@@ -82,6 +88,65 @@ namespace Murdoku.PuzzleEditor
             pendingHorizontalWalls = null;
             pendingVerticalWalls = null;
             hasPendingWallState = false;
+        }
+
+        /// <summary>区域名字列表（按区域 id 索引，空字符串 = 未命名），供保存关卡使用。</summary>
+        public IReadOnlyList<string> RegionNames => regionNames;
+
+        /// <summary>区域名字文字偏移列表（按区域 id 索引，相对几何中心的像素偏移），供保存关卡使用。</summary>
+        public IReadOnlyList<Vector2> RegionNameOffsets => regionNameOffsets;
+
+        /// <summary>
+        /// 用存档中的区域名字恢复显示（载入关卡时调用；旧存档无字段自动跳过）。
+        /// </summary>
+        public void ApplyRegionNames(IReadOnlyList<string> names)
+        {
+            regionNames.Clear();
+            if (names != null)
+            {
+                regionNames.AddRange(names);
+            }
+
+            UpdateRegionLabels();
+        }
+
+        /// <summary>
+        /// 用存档中的区域名字偏移恢复显示（载入关卡时调用；旧存档无字段自动跳过）。
+        /// </summary>
+        public void ApplyRegionNameOffsets(IReadOnlyList<Vector2> offsets)
+        {
+            regionNameOffsets.Clear();
+            if (offsets != null)
+            {
+                regionNameOffsets.AddRange(offsets);
+            }
+
+            UpdateRegionLabels();
+        }
+
+        /// <summary>设置某区域的名字（空字符串 = 清除名字），供协调器的区域命名面板调用。</summary>
+        public void SetRegionName(int regionId, string name)
+        {
+            string trimmed = name == null ? string.Empty : name.Trim();
+            while (regionNames.Count <= regionId)
+            {
+                regionNames.Add(string.Empty);
+            }
+
+            regionNames[regionId] = trimmed;
+            UpdateRegionLabels();
+        }
+
+        /// <summary>设置某区域名字文字的偏移（相对几何中心的像素偏移），供协调器的区域命名面板调用。</summary>
+        public void SetRegionNameOffset(int regionId, Vector2 offset)
+        {
+            while (regionNameOffsets.Count <= regionId)
+            {
+                regionNameOffsets.Add(Vector2.zero);
+            }
+
+            regionNameOffsets[regionId] = offset;
+            UpdateRegionLabels();
         }
 
         private struct BorderButton
@@ -266,6 +331,19 @@ namespace Murdoku.PuzzleEditor
             }
 
             frames.Clear();
+
+            // 棋盘重建：区域结构完全变化，清理区域名字与标签。
+            foreach (GameObject label in regionLabels)
+            {
+                if (label != null)
+                {
+                    Destroy(label);
+                }
+            }
+
+            regionLabels.Clear();
+            regionNames.Clear();
+            regionNameOffsets.Clear();
         }
 
         private void CreateBorders()
@@ -655,6 +733,207 @@ namespace Murdoku.PuzzleEditor
                 regionColor.a = 0.35f;
                 cell.SetRegionOverlay(regionColor);
             }
+
+            // 墙变化后更新区域名字标签的位置。
+            UpdateRegionLabels();
+        }
+
+        /// <summary>
+        /// 计算格子中心在覆盖层本地坐标系中的位置（与 CreateBorders 的坐标公式一致）。
+        /// </summary>
+        private Vector2 GetCellCenter(int row, int col)
+        {
+            GridLayoutGroup layout = board.GridRoot.GetComponent<GridLayoutGroup>();
+            if (layout == null || overlayRoot == null)
+            {
+                return Vector2.zero;
+            }
+
+            float cell = layout.cellSize.x;
+            float spacing = layout.spacing.x;
+            int columns = layout.constraintCount;
+            int rows = currentSize;
+            float gridWidth = overlayRoot.rect.width;
+            float gridHeight = overlayRoot.rect.height;
+
+            float totalWidth = columns * cell + (columns - 1) * spacing;
+            float totalHeight = rows * cell + (rows - 1) * spacing;
+            float originX = (gridWidth - totalWidth) * 0.5f;
+            float originY = (gridHeight - totalHeight) * 0.5f;
+
+            return new Vector2(
+                originX + col * (cell + spacing) + (cell + spacing) * 0.5f,
+                originY + row * (cell + spacing) + (cell + spacing) * 0.5f);
+        }
+
+        /// <summary>
+        /// 重建区域名字标签：为每个已命名的区域在区域中心格子上方创建名字文本。
+        /// 两种模式都显示（出题/游玩均可看到区域名）；未命名的区域不显示。
+        /// </summary>
+        private void UpdateRegionLabels()
+        {
+            foreach (GameObject label in regionLabels)
+            {
+                if (label != null)
+                {
+                    Destroy(label);
+                }
+            }
+
+            regionLabels.Clear();
+
+            if (walls == null || board == null || overlayRoot == null)
+            {
+                return;
+            }
+
+            int[,] regions = walls.ComputeRegions();
+            int columns = board.Columns;
+            int regionCount = 0;
+            for (int index = 0; index < board.Cells.Count; index++)
+            {
+                if (regions[index / columns, index % columns] >= regionCount)
+                {
+                    regionCount = regions[index / columns, index % columns] + 1;
+                }
+            }
+
+            for (int regionId = 0; regionId < regionCount; regionId++)
+            {
+                string name = regionId < regionNames.Count ? regionNames[regionId] : null;
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                // 区域几何中心的格子。
+                int centerIndex = FindRegionCenterCell(regions, columns, regionId);
+                if (centerIndex < 0)
+                {
+                    continue;
+                }
+
+                int row = centerIndex / columns;
+                int col = centerIndex % columns;
+                Vector2 center = GetCellCenter(row, col);
+                Vector2 offset = regionId < regionNameOffsets.Count ? regionNameOffsets[regionId] : Vector2.zero;
+
+                GameObject labelRoot = CreateRegionLabel(name);
+                if (labelRoot == null)
+                {
+                    continue;
+                }
+
+                RectTransform labelRect = labelRoot.GetComponent<RectTransform>();
+                labelRect.anchorMin = Vector2.one * 0.5f;
+                labelRect.anchorMax = Vector2.one * 0.5f;
+                labelRect.pivot = Vector2.one * 0.5f;
+                labelRect.sizeDelta = new Vector2(200f, 64f);
+                labelRect.anchoredPosition = new Vector2(
+                    center.x - overlayRoot.rect.width * 0.5f + offset.x,
+                    -(center.y - overlayRoot.rect.height * 0.5f) + offset.y);
+                regionLabels.Add(labelRoot);
+            }
+        }
+
+        /// <summary>找区域内距离几何中心最近的格子索引（行优先）。</summary>
+        private static int FindRegionCenterCell(int[,] regions, int columns, int targetRegion)
+        {
+            int rows = regions.GetLength(0);
+            float bestDistance = float.MaxValue;
+            int bestIndex = -1;
+            float centerRow = 0f;
+            float centerCol = 0f;
+            int count = 0;
+
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < columns; col++)
+                {
+                    if (regions[row, col] != targetRegion)
+                    {
+                        continue;
+                    }
+
+                    centerRow += row;
+                    centerCol += col;
+                    count++;
+                }
+            }
+
+            if (count == 0)
+            {
+                return -1;
+            }
+
+            centerRow /= count;
+            centerCol /= count;
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < columns; col++)
+                {
+                    if (regions[row, col] != targetRegion)
+                    {
+                        continue;
+                    }
+
+                    float distance = (row - centerRow) * (row - centerRow) + (col - centerCol) * (col - centerCol);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestIndex = row * columns + col;
+                    }
+                }
+            }
+
+            return bestIndex;
+        }
+
+        /// <summary>
+        /// 创建区域名字标签：黑色加粗文字（无背景条），直接显示在区域中心格子上。
+        /// 返回 root（文字子物体铺满，统一管理尺寸/位置/销毁）。
+        /// </summary>
+        private GameObject CreateRegionLabel(string name)
+        {
+            TMP_FontAsset font = GetSceneFont();
+            if (font == null)
+            {
+                return null;
+            }
+
+            GameObject root = new GameObject("RegionLabel", typeof(RectTransform));
+            root.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = (RectTransform)root.transform;
+            rect.SetParent(overlayRoot, false);
+
+            GameObject textObject = new GameObject(
+                "LabelText",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            textObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform textRect = (RectTransform)textObject.transform;
+            textRect.SetParent(rect, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            TMP_Text label = textObject.GetComponent<TextMeshProUGUI>();
+            label.font = font;
+            label.fontSize = 56f;
+            label.color = Color.black;
+            label.alignment = TextAlignmentOptions.Center;
+            label.text = name;
+            label.raycastTarget = false;
+            label.fontStyle = FontStyles.Bold;
+            return root;
+        }
+
+        private static TMP_FontAsset GetSceneFont()
+        {
+            TextMeshProUGUI anyText = FindFirstObjectByType<TextMeshProUGUI>();
+            return anyText == null ? null : anyText.font;
         }
     }
 }

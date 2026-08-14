@@ -44,6 +44,9 @@ namespace Murdoku.Characters
         private Image errorHighlight;
         private Image regionOverlay;
         private Image propImage;
+        private bool editorForbidden;
+        private bool playerMarked;
+        private TMP_Text forbiddenMark;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
@@ -52,6 +55,12 @@ namespace Murdoku.Characters
         public bool IsPlaceable => isPlaceable;
         public bool IsOccupied => currentCharacter != null;
         public CharacterData CurrentCharacter => currentCharacter;
+
+        /// <summary>是否禁止放置人物（出题人禁放规则 + 游玩玩家标记任一为真）。</summary>
+        public bool IsForbidden => editorForbidden || playerMarked;
+
+        /// <summary>出题人禁放状态（保存进关卡；游玩模式隐形生效）。</summary>
+        public bool EditorForbidden => editorForbidden;
 
         private void Awake()
         {
@@ -81,6 +90,8 @@ namespace Murdoku.Characters
             floorSprite = null;
             floorTileIndex = -1;
             propIndex = -1;
+            editorForbidden = false;
+            playerMarked = false;
             Refresh();
         }
 
@@ -175,6 +186,77 @@ namespace Murdoku.Characters
 
         /// <summary>当前道具索引（-1 = 无道具），用于保存关卡。</summary>
         public int PropIndex => propIndex;
+
+        /// <summary>
+        /// 设置出题人禁放状态（保存进关卡）；showMark 控制是否显示黑叉
+        /// （出题模式显示、游玩模式隐形生效——避免剧透禁放格）。
+        /// </summary>
+        public void SetEditorForbidden(bool forbidden, bool showMark)
+        {
+            editorForbidden = forbidden;
+            editorMarkVisible = showMark;
+            RefreshForbiddenMark();
+        }
+
+        /// <summary>
+        /// 游玩模式玩家打叉/取消（推理辅助：标记已排除的区域；显示黑叉、不保存）。
+        /// </summary>
+        public void TogglePlayerMark()
+        {
+            playerMarked = !playerMarked;
+            RefreshForbiddenMark();
+        }
+
+        private bool editorMarkVisible;
+
+        private void RefreshForbiddenMark()
+        {
+            bool show = playerMarked || (editorForbidden && editorMarkVisible);
+            if (show)
+            {
+                EnsureForbiddenMark();
+            }
+
+            if (forbiddenMark != null)
+            {
+                forbiddenMark.gameObject.SetActive(show);
+            }
+        }
+
+        private void EnsureForbiddenMark()
+        {
+            if (forbiddenMark != null)
+            {
+                return;
+            }
+
+            GameObject markObject = new GameObject(
+                "ForbiddenMark",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            markObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform markRect = (RectTransform)markObject.transform;
+            markRect.SetParent(transform, false);
+            markRect.anchorMin = Vector2.zero;
+            markRect.anchorMax = Vector2.one;
+            markRect.offsetMin = Vector2.zero;
+            markRect.offsetMax = Vector2.zero;
+
+            TMP_Text mark = markObject.GetComponent<TextMeshProUGUI>();
+            if (coordinateText != null)
+            {
+                mark.font = coordinateText.font;
+            }
+
+            mark.fontSize = 72f;
+            mark.fontStyle = FontStyles.Bold;
+            mark.color = Color.black;
+            mark.alignment = TextAlignmentOptions.Center;
+            mark.text = "×";
+            mark.raycastTarget = false;
+            forbiddenMark = mark;
+        }
 
         /// <summary>
         /// 设置区域区分叠加层（半透明，叠加在地块图案上方辅助区分区域，不覆盖地块）；
@@ -289,7 +371,7 @@ namespace Murdoku.Characters
 
         public bool TryPlaceCharacter(CharacterData character)
         {
-            if (!isPlaceable || currentCharacter != null || character == null)
+            if (!isPlaceable || currentCharacter != null || character == null || IsForbidden)
             {
                 return false;
             }

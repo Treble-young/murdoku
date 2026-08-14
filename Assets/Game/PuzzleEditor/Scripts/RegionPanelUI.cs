@@ -7,18 +7,19 @@ using UnityEngine.UI;
 namespace Murdoku.PuzzleEditor
 {
     /// <summary>
-    /// 地块面板：展示 5 种样式 × 3 种颜色 = 15 种地块卡片（5 列 × 3 行网格），单选管理。
+    /// 地块面板：20 种地块（5 列 × 4 行网格，方形图标 + 编号），单选管理。
     /// 选中某地块后，点击棋盘格子即为该格铺上对应图案（涂色由协调器处理）。
     /// 卡片在 Configure 时动态创建，无需 prefab。
     /// </summary>
     public sealed class RegionPanelUI : MonoBehaviour
     {
         private const int Columns = 5;
-        private const int Rows = 3;
-        private const float CardWidth = 130f;
-        private const float CardHeight = 150f;
-        private const float ColumnSpacing = 138f; // 130 + 8
-        private const float RowSpacing = 158f;    // 150 + 8
+        private const int Rows = 4;
+        private const float CardWidth = 165f;
+        private const float CardHeight = 158f;
+        private const float ColumnSpacing = 177f; // 165 + 12
+        private const float RowSpacing = 170f;    // 158 + 12
+        private const float GridOffsetY = -50f;   // 网格整体下移，在标题区与面板底部之间居中
 
         private readonly List<RegionCardUI> cards = new List<RegionCardUI>();
         private RegionCardUI selectedCard;
@@ -124,7 +125,7 @@ namespace Murdoku.PuzzleEditor
             root.sizeDelta = new Vector2(CardWidth, CardHeight);
             root.anchoredPosition = new Vector2(
                 (column - (Columns - 1) / 2f) * ColumnSpacing,
-                ((Rows - 1) / 2f - row) * RowSpacing - 10f);
+                ((Rows - 1) / 2f - row) * RowSpacing + GridOffsetY);
 
             // 根 Image：白色卡片底面，同时参与射线检测（IPointerClickHandler 依赖它命中）。
             Image rootImage = rootObject.GetComponent<Image>();
@@ -142,16 +143,28 @@ namespace Murdoku.PuzzleEditor
             CreateBorderBar(border, "LeftBar", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(6f, 0f), new Vector2(3f, 0f), borderColor);
             CreateBorderBar(border, "RightBar", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(6f, 0f), new Vector2(-3f, 0f), borderColor);
 
-            // 图案色块（四周留白边，露出白色卡面）。
+            // 图案色块（四周留白边，露出白色卡面；preserveAspect 保持方形不被拉伸）。
             RectTransform block = CreateRect("ColorBlock", root);
             block.anchorMin = Vector2.zero;
             block.anchorMax = Vector2.one;
-            block.offsetMin = new Vector2(10f, 36f);
-            block.offsetMax = new Vector2(-10f, -10f);
+            block.offsetMin = new Vector2(12f, 40f);
+            block.offsetMax = new Vector2(-12f, -12f);
             Image blockImage = block.gameObject.AddComponent<Image>();
             blockImage.sprite = definition.Sprite;
             blockImage.color = Color.white;
+            blockImage.preserveAspect = true;
             blockImage.raycastTarget = false;
+
+            // 编号：色块中心（深色粗体，与道具卡片一致）。
+            TMP_Text numberText = CreateText(
+                "NumberText",
+                block,
+                definition.Number.ToString(),
+                font,
+                42f,
+                new Color(0.10f, 0.14f, 0.22f, 1f));
+            Stretch(numberText.rectTransform);
+            numberText.fontStyle = FontStyles.Bold;
 
             // 名字：深色（白色卡面上）。
             TMP_Text nameText = CreateText(
@@ -159,7 +172,7 @@ namespace Murdoku.PuzzleEditor
                 root,
                 definition.DisplayName,
                 font,
-                18f,
+                20f,
                 new Color(0.16f, 0.20f, 0.26f, 1f));
             RectTransform nameRect = nameText.rectTransform;
             nameRect.anchorMin = new Vector2(0f, 0f);

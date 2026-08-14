@@ -7,18 +7,19 @@ using UnityEngine.UI;
 namespace Murdoku.PuzzleEditor
 {
     /// <summary>
-    /// 道具面板：16 种测试道具（4 列 × 4 行网格，圆形图标 + 编号），单选管理。
+    /// 道具面板：25 种测试道具（5 列 × 5 行网格，圆形图标 + 编号），单选管理。
     /// 选中某道具后，点击棋盘格子即为该格放置道具（放置/移除由协调器处理）。
     /// 卡片在 Configure 时动态创建，无需 prefab。
     /// </summary>
     public sealed class PropPanelUI : MonoBehaviour
     {
-        private const int Columns = 4;
-        private const int Rows = 4;
-        private const float CardWidth = 110f;
-        private const float CardHeight = 124f;
-        private const float ColumnSpacing = 118f; // 110 + 8
-        private const float RowSpacing = 134f;    // 124 + 10
+        private const int Columns = 5;
+        private const int Rows = 5;
+        private const float CardWidth = 150f;
+        private const float CardHeight = 138f;
+        private const float ColumnSpacing = 162f; // 150 + 12
+        private const float RowSpacing = 142f;    // 138 + 4
+        private const float GridOffsetY = -60f;   // 网格整体下移，在标题区与面板底部之间居中
 
         private readonly List<PropCardUI> cards = new List<PropCardUI>();
         private PropCardUI selectedCard;
@@ -124,7 +125,7 @@ namespace Murdoku.PuzzleEditor
             root.sizeDelta = new Vector2(CardWidth, CardHeight);
             root.anchoredPosition = new Vector2(
                 (column - (Columns - 1) / 2f) * ColumnSpacing,
-                ((Rows - 1) / 2f - row) * RowSpacing - 10f);
+                ((Rows - 1) / 2f - row) * RowSpacing + GridOffsetY);
 
             // 根 Image：白色卡片底面，同时参与射线检测（IPointerClickHandler 依赖它命中）。
             Image rootImage = rootObject.GetComponent<Image>();
@@ -142,15 +143,16 @@ namespace Murdoku.PuzzleEditor
             CreateBorderBar(border, "LeftBar", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(6f, 0f), new Vector2(3f, 0f), borderColor);
             CreateBorderBar(border, "RightBar", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(6f, 0f), new Vector2(-3f, 0f), borderColor);
 
-            // 圆形图标（中心区域，四周留白边露出卡面）。
+            // 圆形图标（中心区域，四周留白边露出卡面；preserveAspect 保持圆形不被拉伸）。
             RectTransform icon = CreateRect("CircleIcon", root);
             icon.anchorMin = Vector2.zero;
             icon.anchorMax = Vector2.one;
-            icon.offsetMin = new Vector2(10f, 36f);
-            icon.offsetMax = new Vector2(-10f, -10f);
+            icon.offsetMin = new Vector2(12f, 38f);
+            icon.offsetMax = new Vector2(-12f, -12f);
             Image iconImage = icon.gameObject.AddComponent<Image>();
             iconImage.sprite = definition.Sprite;
             iconImage.color = Color.white;
+            iconImage.preserveAspect = true;
             iconImage.raycastTarget = false;
 
             // 编号：圆形中心（深色粗体，在亮色圆上清晰可读）。
@@ -159,7 +161,7 @@ namespace Murdoku.PuzzleEditor
                 icon,
                 definition.Number.ToString(),
                 font,
-                36f,
+                40f,
                 new Color(0.10f, 0.14f, 0.22f, 1f));
             Stretch(numberText.rectTransform);
             numberText.fontStyle = FontStyles.Bold;
@@ -170,14 +172,14 @@ namespace Murdoku.PuzzleEditor
                 root,
                 definition.DisplayName,
                 font,
-                18f,
+                20f,
                 new Color(0.16f, 0.20f, 0.26f, 1f));
             RectTransform nameRect = nameText.rectTransform;
             nameRect.anchorMin = new Vector2(0f, 0f);
             nameRect.anchorMax = new Vector2(1f, 0f);
             nameRect.pivot = new Vector2(0.5f, 0.5f);
-            nameRect.sizeDelta = new Vector2(0f, 30f);
-            nameRect.anchoredPosition = new Vector2(0f, 15f);
+            nameRect.sizeDelta = new Vector2(0f, 32f);
+            nameRect.anchoredPosition = new Vector2(0f, 16f);
             nameText.fontStyle = FontStyles.Bold;
 
             PropCardUI card = rootObject.GetComponent<PropCardUI>();
