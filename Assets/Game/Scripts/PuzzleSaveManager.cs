@@ -6,13 +6,24 @@ using UnityEngine;
 namespace Murdoku
 {
     /// <summary>
-    /// 关卡存档管理：把玩家创建的出题保存为 JSON 文件（persistentDataPath/Puzzles/）。
+    /// 关卡存档管理：把玩家创建的出题保存为 JSON 文件。
+    /// 编辑器（开发/出题）存到项目内 Saves/Puzzles/，随 git 同步到云端仓库；
+    /// 构建版（打包后的游戏）存到 persistentDataPath/Puzzles/（可写）。
     /// </summary>
     public static class PuzzleSaveManager
     {
         private static string PuzzlesDirectory
         {
-            get { return Path.Combine(Application.persistentDataPath, "Puzzles"); }
+            get
+            {
+                if (Application.isEditor)
+                {
+                    string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                    return Path.Combine(projectRoot, "Saves", "Puzzles");
+                }
+
+                return Path.Combine(Application.persistentDataPath, "Puzzles");
+            }
         }
 
         public static string GenerateId()
