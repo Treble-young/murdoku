@@ -1,12 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Murdoku.Audio
 {
     public enum SfxCue
     {
         UiClick,
-        CharacterPlace
+        CharacterPlace,
+        CaseSolved
+    }
+
+    public enum MusicCue
+    {
+        Main,
+        Investigation
     }
 
     /// <summary>
@@ -18,13 +26,19 @@ namespace Murdoku.Audio
     {
         private const string ClickResourcePath = "Audio/SFX/ui_click";
         private const string PlaceResourcePath = "Audio/SFX/character_place";
-        private const string MusicResourcePath = "Audio/Music/murdoku_light_mystery";
+        private const string CaseSolvedResourcePath = "Audio/SFX/case_solved";
+        private const string MainMusicResourcePath = "Audio/Music/murdoku_light_mystery";
+        private const string InvestigationMusicResourcePath = "Audio/Music/investigation_strings_choir";
+        private const string MainMenuSceneName = "SampleScene";
+        private const string LevelSelectSceneName = "LevelSelectScene";
 
         private static GameAudio instance;
 
         private readonly Dictionary<SfxCue, AudioClip> sfxClips = new Dictionary<SfxCue, AudioClip>();
+        private readonly Dictionary<MusicCue, AudioClip> musicClips = new Dictionary<MusicCue, AudioClip>();
         private AudioSource sfxSource;
         private AudioSource musicSource;
+        private MusicCue? currentMusicCue;
         private bool initialized;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -45,6 +59,15 @@ namespace Murdoku.Audio
             if (audio != null)
             {
                 audio.PlayInternal(cue);
+            }
+        }
+
+        public static void SetMusic(MusicCue cue)
+        {
+            GameAudio audio = EnsureInstance();
+            if (audio != null)
+            {
+                audio.SetMusicInternal(cue);
             }
         }
 
@@ -77,6 +100,7 @@ namespace Murdoku.Audio
 
             instance = this;
             DontDestroyOnLoad(gameObject);
+            SceneManager.sceneLoaded += HandleSceneLoaded;
             Initialize();
         }
 
@@ -84,6 +108,7 @@ namespace Murdoku.Audio
         {
             if (instance == this)
             {
+                SceneManager.sceneLoaded -= HandleSceneLoaded;
                 instance = null;
             }
         }
@@ -104,15 +129,15 @@ namespace Murdoku.Audio
 
             sfxClips[SfxCue.UiClick] = LoadClip(ClickResourcePath, "UI click");
             sfxClips[SfxCue.CharacterPlace] = LoadClip(PlaceResourcePath, "character place");
+            sfxClips[SfxCue.CaseSolved] = LoadClip(CaseSolvedResourcePath, "case solved");
 
-            AudioClip musicClip = LoadClip(MusicResourcePath, "background music");
-            if (musicClip != null)
-            {
-                musicSource.clip = musicClip;
-                musicSource.Play();
-            }
+            musicClips[MusicCue.Main] = LoadClip(MainMusicResourcePath, "main background music");
+            musicClips[MusicCue.Investigation] = LoadClip(
+                InvestigationMusicResourcePath,
+                "investigation background music");
 
             initialized = true;
+            SetMusicInternal(MusicCue.Main);
         }
 
         private static void ConfigureSource(AudioSource source, float volume)
@@ -142,6 +167,36 @@ namespace Murdoku.Audio
             if (sfxSource != null && sfxClips.TryGetValue(cue, out AudioClip clip) && clip != null)
             {
                 sfxSource.PlayOneShot(clip);
+            }
+        }
+
+        private void SetMusicInternal(MusicCue cue)
+        {
+            Initialize();
+
+            if (musicSource == null || !musicClips.TryGetValue(cue, out AudioClip clip) || clip == null)
+            {
+                return;
+            }
+
+            if (currentMusicCue != cue || musicSource.clip != clip)
+            {
+                musicSource.Stop();
+                musicSource.clip = clip;
+                currentMusicCue = cue;
+            }
+
+            if (!musicSource.isPlaying)
+            {
+                musicSource.Play();
+            }
+        }
+
+        private void HandleSceneLoaded(Scene scene, LoadSceneMode loadMode)
+        {
+            if (scene.name == MainMenuSceneName || scene.name == LevelSelectSceneName)
+            {
+                SetMusicInternal(MusicCue.Main);
             }
         }
     }

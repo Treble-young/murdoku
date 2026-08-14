@@ -61,6 +61,7 @@ namespace Murdoku.Characters
         private void Start()
         {
             playMode = !string.IsNullOrEmpty(PuzzleSession.SelectedPuzzleId);
+            GameAudio.SetMusic(playMode ? MusicCue.Investigation : MusicCue.Main);
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
             EnsureRegionPanel();
@@ -1298,6 +1299,7 @@ namespace Murdoku.Characters
 
             if (roomMates.Count == 1)
             {
+                GameAudio.Play(SfxCue.CaseSolved);
                 ShowPopup("破案成功！", "凶手是 " + roomMates[0].DisplayName + "：TA 与受害者同处一室且身边没有其他人。");
                 SetStatus("破案成功！凶手是 " + roomMates[0].DisplayName + "。", false);
                 return;
