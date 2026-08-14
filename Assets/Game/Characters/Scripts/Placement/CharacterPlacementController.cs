@@ -125,6 +125,7 @@ namespace Murdoku.Characters
             }
 
             placements[character] = cell;
+            SetCharacterPlacedState(character, true);
 
             // 记录撤销历史：移动记录原格子，首次放置记录 null；新操作清空重做栈。
             undoHistory.Add(new PlacementUndoEntry
@@ -175,6 +176,8 @@ namespace Murdoku.Characters
                 fromAfterUndo = entry.FromCell;
             }
 
+            SetCharacterPlacedState(entry.Character, fromAfterUndo != null);
+
             // 记录重做信息：撤销后人物所在位置 + 重做目标（ToCell）。
             redoHistory.Add(new PlacementUndoEntry
             {
@@ -220,6 +223,8 @@ namespace Murdoku.Characters
             {
                 placements[entry.Character] = entry.ToCell;
             }
+
+            SetCharacterPlacedState(entry.Character, placed);
 
             // 记录撤销信息：重做后人物所在位置。
             undoHistory.Add(new PlacementUndoEntry
@@ -408,6 +413,14 @@ namespace Murdoku.Characters
             selectionSource.SelectionChanged -= HandleSelectionChanged;
             selectionSource.SelectionChanged += HandleSelectionChanged;
             SelectedCharacter = selectionSource.SelectedCharacter;
+
+            foreach (CharacterData character in selectionSource.Characters)
+            {
+                bool placed = character != null &&
+                              placements.TryGetValue(character, out ICharacterPlacementCell cell) &&
+                              cell != null;
+                selectionSource.SetCharacterPlaced(character, placed);
+            }
         }
 
         private void UnsubscribeFromSelectionSource()
@@ -421,6 +434,14 @@ namespace Murdoku.Characters
         private void HandleSelectionChanged(CharacterData character)
         {
             SelectedCharacter = character;
+        }
+
+        private void SetCharacterPlacedState(CharacterData character, bool placed)
+        {
+            if (selectionSource != null)
+            {
+                selectionSource.SetCharacterPlaced(character, placed);
+            }
         }
     }
 }

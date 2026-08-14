@@ -234,10 +234,29 @@ namespace Murdoku.Characters.Editor
             Require(
                 placement.HandleCharacterDropped(leoCard.Character, board.Cells[0]) == CharacterPlacementResult.Placed,
                 "Dragging Leo must place it in the first empty cell.");
+            Require(leoCard.IsPlaced, "Leo's card must dim after a successful placement.");
+            RectTransform leoDimOverlay = leoVisualRoot.Find("PlacedDimOverlay") as RectTransform;
+            Require(leoDimOverlay != null && leoDimOverlay.gameObject.activeSelf, "Leo's full-card dim overlay must be visible after placement.");
+            Require(ReferenceEquals(leoDimOverlay.parent, leoVisualRoot), "The placed dim overlay must be a direct child of VisualRoot.");
+            Require(
+                leoDimOverlay.anchorMin == Vector2.zero && leoDimOverlay.anchorMax == Vector2.one &&
+                leoDimOverlay.offsetMin == Vector2.zero && leoDimOverlay.offsetMax == Vector2.zero,
+                "The placed dim overlay must stretch across the entire card.");
+            Image leoDimImage = leoDimOverlay.GetComponent<Image>();
+            Require(
+                leoDimImage != null && Approximately(leoDimImage.color.a, 0.60f) && !leoDimImage.raycastTarget,
+                "The placed dim overlay must use 60% black and must not block raycasts.");
             Require(
                 placement.HandleCharacterDropped(leoCard.Character, board.Cells[1]) == CharacterPlacementResult.Moved,
                 "Dragging Leo must move it to a second empty cell.");
             Require(!board.Cells[0].IsOccupied && board.Cells[1].IsOccupied, "Moving Leo must clear the old cell.");
+            Require(leoCard.IsPlaced, "Leo's card must remain dim after moving between cells.");
+            Require(placement.UndoLastPlacement(), "Undoing Leo's move must succeed.");
+            Require(board.Cells[0].IsOccupied && !board.Cells[1].IsOccupied, "Undoing Leo's move must restore the original cell.");
+            Require(leoCard.IsPlaced, "Undoing a move must keep Leo's card dim.");
+            Require(placement.RedoLastPlacement(), "Redoing Leo's move must succeed.");
+            Require(!board.Cells[0].IsOccupied && board.Cells[1].IsOccupied, "Redoing Leo's move must restore the destination cell.");
+            Require(leoCard.IsPlaced, "Redoing a move must keep Leo's card dim.");
 
             InvokeCardClick(minaCard);
             placement.SetSelectionSource(null);
@@ -249,14 +268,26 @@ namespace Murdoku.Characters.Editor
             Require(
                 placement.HandleCharacterDropped(minaCard.Character, board.Cells[2]) == CharacterPlacementResult.RowColumnConflict,
                 "Dragging Mina must be rejected when its row is already occupied.");
+            Require(!minaCard.IsPlaced, "Mina's card must not dim after rejected placements.");
             Require(
                 placement.HandleCharacterDropped(minaCard.Character, board.Cells[6]) == CharacterPlacementResult.Placed,
                 "Dragging Mina must place it in a free row and column.");
             Require(board.Cells[1].CurrentCharacter.DisplayName == "Leo", "Leo must remain in place after a rejected placement.");
             Require(!board.Cells[2].IsOccupied, "A rejected placement must leave the target cell empty.");
             Require(board.Cells[6].CurrentCharacter.DisplayName == "Mina", "Mina must occupy the new cell.");
+            Require(minaCard.IsPlaced, "Mina's card must dim after a successful placement.");
+            Transform minaDimOverlay = minaCard.transform.Find("LayoutRoot/VisualRoot/PlacedDimOverlay");
+            Require(minaDimOverlay != null && minaDimOverlay.gameObject.activeSelf, "Mina's full-card dim overlay must be visible after placement.");
+            Require(placement.UndoLastPlacement(), "Undoing Mina's first placement must succeed.");
+            Require(
+                !board.Cells[6].IsOccupied && !minaCard.IsPlaced && !minaDimOverlay.gameObject.activeSelf,
+                "Undoing a first placement must restore the card and clear the cell.");
+            Require(placement.RedoLastPlacement(), "Redoing Mina's first placement must succeed.");
+            Require(
+                board.Cells[6].IsOccupied && minaCard.IsPlaced && minaDimOverlay.gameObject.activeSelf,
+                "Redoing a first placement must dim the card and restore the cell.");
 
-            Debug.Log("CharacterPanelTest validation passed: hierarchy, selection toggle, drag placement, movement, occupancy, and row/column rule checks succeeded.");
+            Debug.Log("CharacterPanelTest validation passed: hierarchy, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
         }
 
         [MenuItem("Tools/Murdoku/Open Character Panel Test and Play")]

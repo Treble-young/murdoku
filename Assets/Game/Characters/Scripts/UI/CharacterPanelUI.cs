@@ -14,6 +14,7 @@ namespace Murdoku.Characters
         [SerializeField] private List<CharacterData> characters = new List<CharacterData>();
 
         private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
+        private readonly HashSet<CharacterData> placedCharacters = new HashSet<CharacterData>();
         private CharacterCardUI selectedCard;
         private TestBoardController board;
         private GameObject blackXCard;
@@ -153,10 +154,45 @@ namespace Murdoku.Characters
         public void SetCharacters(IEnumerable<CharacterData> characterData)
         {
             characters.Clear();
+            placedCharacters.Clear();
             if (characterData != null)
             {
                 characters.AddRange(characterData);
             }
+        }
+
+        /// <summary>
+        /// 同步人物是否已经放入棋盘，并立即刷新对应的左侧卡片。
+        /// </summary>
+        public void SetCharacterPlaced(CharacterData character, bool placed)
+        {
+            if (character == null)
+            {
+                return;
+            }
+
+            if (placed)
+            {
+                placedCharacters.Add(character);
+            }
+            else
+            {
+                placedCharacters.Remove(character);
+            }
+
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null && ReferenceEquals(card.Character, character))
+                {
+                    card.SetPlaced(placed);
+                    break;
+                }
+            }
+        }
+
+        public bool IsCharacterPlaced(CharacterData character)
+        {
+            return character != null && placedCharacters.Contains(character);
         }
 
         /// <summary>
@@ -213,6 +249,7 @@ namespace Murdoku.Characters
                 card.name = $"CharacterCard_{character.DisplayName}";
                 card.Bind(character, HandleCardClicked, HandleCardDragStarted);
                 card.SetGenderToggleEnabled(genderToggleEnabled);
+                card.SetPlaced(placedCharacters.Contains(character));
                 cards.Add(card);
             }
 

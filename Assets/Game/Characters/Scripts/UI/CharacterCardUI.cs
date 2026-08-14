@@ -23,6 +23,10 @@ namespace Murdoku.Characters
         [SerializeField] private TMP_Text nameText;
         [SerializeField] private TMP_Text clueText;
 
+        [Header("Placed State")]
+        [Range(0f, 1f)]
+        [SerializeField] private float placedDimAlpha = 0.60f;
+
         [Header("Selection Animation")]
         [Min(1f)]
         [SerializeField] private float selectedScale = 1.1f;
@@ -39,9 +43,13 @@ namespace Murdoku.Characters
         private RectTransform genderCircleRect;
         private TMP_Text genderSymbolText;
         private bool genderToggleEnabled = true;
+        private bool isPlaced;
+        private Image placedDimOverlay;
         private readonly Vector3[] genderCorners = new Vector3[4];
 
         public CharacterData Character => character;
+
+        public bool IsPlaced => isPlaced;
 
         /// <summary>
         /// 控制性别切换按钮是否可点击（游玩模式禁用：按钮仍显示 ♂/♀ 供玩家查看，但点击不切换；
@@ -237,6 +245,7 @@ namespace Murdoku.Characters
             character = data;
             clicked = onClicked;
             dragStarted = onDragStarted;
+            SetPlaced(false);
 
             if (data == null)
             {
@@ -278,6 +287,72 @@ namespace Murdoku.Characters
             }
 
             SetSelected(false, false);
+        }
+
+        /// <summary>
+        /// 设置人物是否已经放入棋盘。遮罩覆盖整张卡片，但不影响点击和拖拽。
+        /// </summary>
+        public void SetPlaced(bool placed)
+        {
+            isPlaced = placed;
+
+            Image overlay = EnsurePlacedDimOverlay();
+            if (overlay == null)
+            {
+                return;
+            }
+
+            overlay.color = new Color(0f, 0f, 0f, Mathf.Clamp01(placedDimAlpha));
+            overlay.gameObject.SetActive(placed);
+        }
+
+        private Image EnsurePlacedDimOverlay()
+        {
+            if (visualRoot == null)
+            {
+                return null;
+            }
+
+            if (placedDimOverlay == null)
+            {
+                Transform existing = visualRoot.Find("PlacedDimOverlay");
+
+                // 兼容脚本热重载前创建在头像容器下的旧遮罩实例。
+                if (existing == null && portraitImage != null && portraitImage.transform.parent != null)
+                {
+                    existing = portraitImage.transform.parent.Find("PlacedDimOverlay");
+                }
+
+                if (existing != null)
+                {
+                    placedDimOverlay = existing.GetComponent<Image>();
+                }
+            }
+
+            if (placedDimOverlay == null)
+            {
+                GameObject overlayObject = new GameObject(
+                    "PlacedDimOverlay",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                overlayObject.layer = gameObject.layer;
+                placedDimOverlay = overlayObject.GetComponent<Image>();
+            }
+
+            RectTransform overlayRect = placedDimOverlay.rectTransform;
+            overlayRect.SetParent(visualRoot, false);
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.pivot = new Vector2(0.5f, 0.5f);
+            overlayRect.offsetMin = Vector2.zero;
+            overlayRect.offsetMax = Vector2.zero;
+            overlayRect.localRotation = Quaternion.identity;
+            overlayRect.localScale = Vector3.one;
+            overlayRect.SetAsLastSibling();
+
+            placedDimOverlay.raycastTarget = false;
+            return placedDimOverlay;
         }
 
         public void OnBeginDrag(PointerEventData eventData)
