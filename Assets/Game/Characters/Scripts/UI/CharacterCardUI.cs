@@ -82,6 +82,14 @@ namespace Murdoku.Characters
             }
         }
 
+        /// <summary>
+        /// 重新把角色当前性别同步到卡片性别符号（载入关卡恢复性别后调用）。
+        /// </summary>
+        public void RefreshGender()
+        {
+            UpdateGenderVisual();
+        }
+
         private void Awake()
         {
             if (button != null)

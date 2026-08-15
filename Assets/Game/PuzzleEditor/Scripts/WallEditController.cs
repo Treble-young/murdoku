@@ -368,8 +368,10 @@ namespace Murdoku.PuzzleEditor
 
             float cell = layout.cellSize.x;
             float spacing = layout.spacing.x;
-            int columns = layout.constraintCount;
-            int rows = currentSize;
+            // 行列数必须与墙数据（walls）完全一致，否则查墙状态/算位置会数组越界。
+            // 不能用 layout.constraintCount：棋盘重建交错的瞬间布局列数可能滞后于墙尺寸。
+            int rows = walls.Size;
+            int columns = walls.Size;
             float gridWidth = overlayRoot.rect.width;
             float gridHeight = overlayRoot.rect.height;
 
@@ -566,9 +568,25 @@ namespace Murdoku.PuzzleEditor
                 return false;
             }
 
-            return border.IsHorizontal
-                ? walls.GetHorizontalWall(border.Row, border.Col)
-                : walls.GetVerticalWall(border.Row, border.Col);
+            int size = walls.Size;
+            if (border.IsHorizontal)
+            {
+                // 水平墙数组 (size-1)×size。
+                if (border.Row < 0 || border.Row >= size - 1 || border.Col < 0 || border.Col >= size)
+                {
+                    return false;
+                }
+
+                return walls.GetHorizontalWall(border.Row, border.Col);
+            }
+
+            // 垂直墙数组 size×(size-1)。
+            if (border.Row < 0 || border.Row >= size || border.Col < 0 || border.Col >= size - 1)
+            {
+                return false;
+            }
+
+            return walls.GetVerticalWall(border.Row, border.Col);
         }
 
         private void ApplyMode()
@@ -751,8 +769,10 @@ namespace Murdoku.PuzzleEditor
 
             float cell = layout.cellSize.x;
             float spacing = layout.spacing.x;
-            int columns = layout.constraintCount;
-            int rows = currentSize;
+            // 行列数必须与墙数据（walls）完全一致，否则查墙状态/算位置会数组越界。
+            // 不能用 layout.constraintCount：棋盘重建交错的瞬间布局列数可能滞后于墙尺寸。
+            int rows = walls.Size;
+            int columns = walls.Size;
             float gridWidth = overlayRoot.rect.width;
             float gridHeight = overlayRoot.rect.height;
 

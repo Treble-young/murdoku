@@ -62,10 +62,24 @@ namespace Murdoku.Characters
 
                     if (string.Equals(character.CharacterId, clue.characterId, StringComparison.OrdinalIgnoreCase))
                     {
-                        // 恢复出题人设定的名字（旧存档无名字字段则保持随机名）。
+                        // 恢复出题人设定的名字/性别（旧存档无字段则按名字推断性别，保持名字）。
                         if (!string.IsNullOrWhiteSpace(clue.name))
                         {
                             character.SetDisplayName(clue.name);
+                        }
+
+                        if (clue.gender != CharacterGender.Unknown)
+                        {
+                            character.SetGender(clue.gender);
+                        }
+                        else
+                        {
+                            // 旧存档没有性别字段：按名字推断补充（重新保存后即固定入档）。
+                            CharacterGender inferred = SuspectGenerator.InferGenderFromName(character.DisplayName);
+                            if (inferred != CharacterGender.Unknown)
+                            {
+                                character.SetGender(inferred);
+                            }
                         }
 
                         character.SetClue(clue.clue);
@@ -76,6 +90,18 @@ namespace Murdoku.Characters
 
             RefreshAllClues();
             RefreshAllNames();
+            RefreshAllGenders();
+        }
+
+        public void RefreshAllGenders()
+        {
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null)
+                {
+                    card.RefreshGender();
+                }
+            }
         }
 
         public void RefreshAllNames()

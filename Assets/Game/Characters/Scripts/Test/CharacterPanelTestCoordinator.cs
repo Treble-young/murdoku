@@ -301,7 +301,8 @@ namespace Murdoku.Characters
                     {
                         characterId = character.CharacterId,
                         clue = character.Clue ?? string.Empty,
-                        name = character.DisplayName
+                        name = character.DisplayName,
+                        gender = character.Gender
                     });
                 }
             }

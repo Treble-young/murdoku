@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Murdoku.Characters;
 using UnityEngine;
 
 namespace Murdoku
@@ -23,6 +24,9 @@ namespace Murdoku
 
         /// <summary>角色显示名（出题时设定的名字，游玩模式载入时恢复；旧存档无此字段自动跳过）。</summary>
         public string name;
+
+        /// <summary>角色性别（出题时设定的性别，游玩模式载入时恢复；Unknown = 旧存档未设置，保持随机）。</summary>
+        public CharacterGender gender;
     }
 
     [Serializable]

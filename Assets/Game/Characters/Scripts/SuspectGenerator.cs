@@ -73,6 +73,36 @@ namespace Murdoku.Characters
             return result;
         }
 
+        // 名字 → 性别映射（名字池中每个名字的性别；旧存档缺性别时按名字推断）。
+        private static readonly Dictionary<string, CharacterGender> GenderMap = new Dictionary<string, CharacterGender>
+        {
+            { "Alan", CharacterGender.Male }, { "Andy", CharacterGender.Male }, { "Alice", CharacterGender.Female }, { "Amy", CharacterGender.Female }, { "Alex", CharacterGender.Male },
+            { "Bob", CharacterGender.Male }, { "Ben", CharacterGender.Male }, { "Betty", CharacterGender.Female }, { "Brian", CharacterGender.Male }, { "Bella", CharacterGender.Female },
+            { "Carl", CharacterGender.Male }, { "Cathy", CharacterGender.Female }, { "Cindy", CharacterGender.Female }, { "Chris", CharacterGender.Male }, { "Carol", CharacterGender.Female },
+            { "Dave", CharacterGender.Male }, { "Diana", CharacterGender.Female }, { "Danny", CharacterGender.Male }, { "Doris", CharacterGender.Female }, { "Duke", CharacterGender.Male },
+            { "Emma", CharacterGender.Female }, { "Eric", CharacterGender.Male }, { "Eva", CharacterGender.Female }, { "Eddie", CharacterGender.Male }, { "Ella", CharacterGender.Female },
+            { "Frank", CharacterGender.Male }, { "Fiona", CharacterGender.Female }, { "Fred", CharacterGender.Male }, { "Faith", CharacterGender.Female }, { "Felix", CharacterGender.Male },
+            { "Gary", CharacterGender.Male }, { "Grace", CharacterGender.Female }, { "Gina", CharacterGender.Female }, { "George", CharacterGender.Male }, { "Gwen", CharacterGender.Female },
+            { "Henry", CharacterGender.Male }, { "Helen", CharacterGender.Female }, { "Hugo", CharacterGender.Male }, { "Hannah", CharacterGender.Female }, { "Hank", CharacterGender.Male },
+            { "Ivan", CharacterGender.Male }, { "Ivy", CharacterGender.Female }, { "Ian", CharacterGender.Male }, { "Iris", CharacterGender.Female }, { "Ingrid", CharacterGender.Female },
+            { "Jack", CharacterGender.Male }, { "Jane", CharacterGender.Female }, { "John", CharacterGender.Male }, { "Julia", CharacterGender.Female }, { "Jerry", CharacterGender.Male },
+            { "Kevin", CharacterGender.Male }, { "Kate", CharacterGender.Female }, { "Ken", CharacterGender.Male }, { "Karen", CharacterGender.Female }, { "Kyle", CharacterGender.Male }
+        };
+
+        /// <summary>
+        /// 按名字推断性别（名字池中的名字自带性别；未知名字返回 Unknown）。
+        /// 用于为旧存档（无性别字段）补充性别数据。
+        /// </summary>
+        public static CharacterGender InferGenderFromName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return CharacterGender.Unknown;
+            }
+
+            return GenderMap.TryGetValue(name.Trim(), out CharacterGender gender) ? gender : CharacterGender.Unknown;
+        }
+
         private static string PickName(char letter)
         {
             if (!NamePool.TryGetValue(letter, out string[] names) || names.Length == 0)
