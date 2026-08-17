@@ -103,10 +103,10 @@ TextureImporter:
       name: prop_13_0
       rect:
         serializedVersion: 2
-        x: 1
+        x: 35
         y: 0
-        width: 247
-        height: 206
+        width: 204
+        height: 277
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
