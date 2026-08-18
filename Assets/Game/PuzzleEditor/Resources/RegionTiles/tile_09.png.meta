@@ -3,8 +3,8 @@ guid: 8579938772f81b240bd4e1dfa5d02f12
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 420142975609385221
-    second: sand_gold_0
+      213: -47128018377544277
+    second: tile_09_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: sand_gold_0
+      name: tile_09_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 56
-        height: 56
+        width: 396
+        height: 396
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 501b2107fc5a4d500800000000000000
-      internalID: 420142975609385221
+      spriteID: bad63a52151985ff0800000000000000
+      internalID: -47128018377544277
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      sand_gold_0: 420142975609385221
+      tile_09_0: -47128018377544277
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

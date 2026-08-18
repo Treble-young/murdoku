@@ -3,8 +3,8 @@ guid: 66f68cdc326d78449a1cfbfecc687606
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5363943790860323211
-    second: sand_light_0
+      213: -6833579883134209608
+    second: tile_10_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: sand_light_0
+      name: tile_10_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 116
-        height: 116
+        width: 361
+        height: 361
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 576bb96aa817f85b0800000000000000
-      internalID: -5363943790860323211
+      spriteID: 8b1b7895d4f3a21a0800000000000000
+      internalID: -6833579883134209608
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      sand_light_0: -5363943790860323211
+      tile_10_0: -6833579883134209608
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

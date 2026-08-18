@@ -3,8 +3,8 @@ guid: 08e28ac20e85ff640b70e922adecebcf
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -7826783696021937410
-    second: checkered_slate_0
+      213: 7773415090011355470
+    second: tile_08_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: checkered_slate_0
+      name: tile_08_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 55
-        height: 56
+        width: 393
+        height: 396
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: ef22bc052bda16390800000000000000
-      internalID: -7826783696021937410
+      spriteID: e49b9cbc6d7b0eb60800000000000000
+      internalID: 7773415090011355470
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      checkered_slate_0: -7826783696021937410
+      tile_08_0: 7773415090011355470
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

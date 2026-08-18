@@ -27,12 +27,12 @@ namespace Murdoku.PuzzleEditor
     }
 
     /// <summary>
-    /// 道具定义库（25 种测试道具，5×5 排布）与圆形图标纹理生成。
+    /// 道具定义库（35 种测试道具，5×7 排布，面板内滚轮滚动查看）与圆形图标纹理生成。
     /// </summary>
     public static class PropStyleFactory
     {
         private const int TexSize = 64;
-        private const int PropCount = 25;
+        private const int PropCount = 35;
 
         private static PropDefinition[] all;
 

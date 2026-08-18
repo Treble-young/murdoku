@@ -7,19 +7,20 @@ using UnityEngine.UI;
 namespace Murdoku.PuzzleEditor
 {
     /// <summary>
-    /// 道具面板：25 种测试道具（5 列 × 5 行网格，圆形图标 + 编号），单选管理。
+    /// 道具面板：35 种测试道具（5 列 × 7 行网格，圆形图标 + 编号，滚轮滚动查看），单选管理。
     /// 选中某道具后，点击棋盘格子即为该格放置道具（放置/移除由协调器处理）。
     /// 卡片在 Configure 时动态创建，无需 prefab。
     /// </summary>
     public sealed class PropPanelUI : MonoBehaviour
     {
         private const int Columns = 5;
-        private const int Rows = 5;
+        private const int Rows = 7;
         private const float CardWidth = 150f;
         private const float CardHeight = 138f;
         private const float ColumnSpacing = 162f; // 150 + 12
         private const float RowSpacing = 142f;    // 138 + 4
-        private const float GridOffsetY = -60f;   // 网格整体下移，在标题区与面板底部之间居中
+        private const float ContentPadding = 20f; // 网格与内容顶部/底部的留白
+        private RectTransform contentRect;
 
         private readonly List<PropCardUI> cards = new List<PropCardUI>();
         private PropCardUI selectedCard;
@@ -38,7 +39,58 @@ namespace Murdoku.PuzzleEditor
             font = uiFont;
             PropStyleFactory.EnsureSprites();
             ApplyPanelStyle();
+            EnsureScrollContainer();
             Rebuild();
+        }
+
+        /// <summary>
+        /// 构建滚动容器：面板自身作为视口（ScrollRect + RectMask2D 裁剪），
+        /// 卡片挂到可滚动的 content 上（7 行网格超出面板高度，用滚轮查看）。
+        /// </summary>
+        private void EnsureScrollContainer()
+        {
+            if (contentRect != null)
+            {
+                return;
+            }
+
+            RectTransform panelRect = (RectTransform)transform;
+
+            // 面板 Image 需要参与射线命中，滚轮事件才能落在面板空隙上（卡片上已有命中）。
+            Image background = GetComponent<Image>();
+            if (background != null)
+            {
+                background.raycastTarget = true;
+            }
+
+            ScrollRect scroll = GetComponent<ScrollRect>();
+            if (scroll == null)
+            {
+                scroll = gameObject.AddComponent<ScrollRect>();
+            }
+
+            RectMask2D mask = GetComponent<RectMask2D>();
+            if (mask == null)
+            {
+                mask = gameObject.AddComponent<RectMask2D>();
+            }
+
+            contentRect = new GameObject("ScrollContent", typeof(RectTransform)).GetComponent<RectTransform>();
+            contentRect.SetParent(transform, false);
+            contentRect.anchorMin = new Vector2(0.5f, 1f);
+            contentRect.anchorMax = new Vector2(0.5f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.anchoredPosition = Vector2.zero;
+            float panelWidth = panelRect.rect.width > 0f ? panelRect.rect.width : 940f;
+            float contentHeight = (Rows - 1) * RowSpacing + CardHeight + ContentPadding * 2f;
+            contentRect.sizeDelta = new Vector2(panelWidth, contentHeight);
+
+            scroll.content = contentRect;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+            scroll.inertia = true;
         }
 
         /// <summary>
@@ -118,14 +170,15 @@ namespace Murdoku.PuzzleEditor
                 typeof(PropCardUI));
             rootObject.layer = LayerMask.NameToLayer("UI");
             RectTransform root = rootObject.GetComponent<RectTransform>();
-            root.SetParent(transform, false);
-            root.anchorMin = new Vector2(0.5f, 0.5f);
-            root.anchorMax = new Vector2(0.5f, 0.5f);
+            root.SetParent(contentRect != null ? contentRect : (RectTransform)transform, false);
+            root.anchorMin = new Vector2(0.5f, 1f);
+            root.anchorMax = new Vector2(0.5f, 1f);
             root.pivot = new Vector2(0.5f, 0.5f);
             root.sizeDelta = new Vector2(CardWidth, CardHeight);
+            // x 相对内容中心居中；y 从内容顶部往下排（滚轮滚动查看）。
             root.anchoredPosition = new Vector2(
                 (column - (Columns - 1) / 2f) * ColumnSpacing,
-                ((Rows - 1) / 2f - row) * RowSpacing + GridOffsetY);
+                -(ContentPadding + row * RowSpacing + CardHeight * 0.5f));
 
             // 根 Image：白色卡片底面，同时参与射线检测（IPointerClickHandler 依赖它命中）。
             Image rootImage = rootObject.GetComponent<Image>();

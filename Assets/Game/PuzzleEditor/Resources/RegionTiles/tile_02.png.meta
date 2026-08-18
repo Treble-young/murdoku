@@ -3,8 +3,8 @@ guid: f639a3718588b0843853c69cc2ba079f
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8792246497259198439
-    second: grass_mid_0
+      213: -914760476989975223
+    second: tile_02_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: grass_mid_0
+      name: tile_02_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 57
-        height: 57
+        width: 344
+        height: 359
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 7e79ece1b95540a70800000000000000
-      internalID: 8792246497259198439
+      spriteID: 945127a513e1e43f0800000000000000
+      internalID: -914760476989975223
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      grass_mid_0: 8792246497259198439
+      tile_02_0: -914760476989975223
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

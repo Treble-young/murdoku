@@ -3,8 +3,8 @@ guid: b218327f58bae344591748cf80e33c78
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -9002996222009044590
-    second: wood_light_0
+      213: -6607893470347333376
+    second: tile_04_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: wood_light_0
+      name: tile_04_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 101
-        height: 101
+        width: 392
+        height: 392
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 29197f0d2aeee0380800000000000000
-      internalID: -9002996222009044590
+      spriteID: 001f25a16eb0c44a0800000000000000
+      internalID: -6607893470347333376
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      wood_light_0: -9002996222009044590
+      tile_04_0: -6607893470347333376
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

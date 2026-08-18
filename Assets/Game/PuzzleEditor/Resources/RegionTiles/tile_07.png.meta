@@ -3,8 +3,8 @@ guid: 6cfc726ddca6a5f4dbbe776249c84e2c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1524894032321178626
-    second: checkered_light_0
+      213: -6443424836301529625
+    second: tile_07_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: checkered_light_0
+      name: tile_07_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 53
-        height: 53
+        width: 395
+        height: 395
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 20ced9c0b03892510800000000000000
-      internalID: 1524894032321178626
+      spriteID: 7ed5157004b5496a0800000000000000
+      internalID: -6443424836301529625
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      checkered_light_0: 1524894032321178626
+      tile_07_0: -6443424836301529625
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
