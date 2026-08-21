@@ -21,6 +21,7 @@ namespace Murdoku.Characters
         private GameObject blackXBorder;
         private bool blackXActive;
         private Coroutine blackXScaleRoutine;
+        private TMP_Text globalClueText;
         private const float BlackXSelectedScale = 1.1f;
         private const float BlackXScaleDuration = 0.1f;
 
@@ -102,6 +103,83 @@ namespace Murdoku.Characters
                     card.RefreshGender();
                 }
             }
+        }
+
+        /// <summary>
+        /// 设置全局线索文本（显示在嫌疑人卡片下方）；空字符串隐藏。
+        /// </summary>
+        public void SetGlobalClue(string clue)
+        {
+            string text = string.IsNullOrWhiteSpace(clue) ? string.Empty : clue.Trim();
+            if (text.Length == 0)
+            {
+                if (globalClueText != null)
+                {
+                    globalClueText.gameObject.SetActive(false);
+                }
+
+                return;
+            }
+
+            EnsureGlobalClueText();
+            if (globalClueText != null)
+            {
+                globalClueText.text = text;
+                globalClueText.gameObject.SetActive(true);
+            }
+        }
+
+        private void EnsureGlobalClueText()
+        {
+            if (globalClueText != null)
+            {
+                return;
+            }
+
+            Transform parent = view == null ? null : view.CharacterGrid;
+            if (parent == null)
+            {
+                return;
+            }
+
+            RectTransform gridRect = view.CharacterGrid;
+            TMP_FontAsset font = FindFirstObjectByType<TextMeshProUGUI>().font;
+
+            GameObject backgroundObject = new GameObject("GlobalClue", typeof(RectTransform), typeof(Image));
+            backgroundObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform backgroundRect = (RectTransform)backgroundObject.transform;
+            backgroundRect.SetParent(gridRect.parent, false);
+            backgroundRect.anchorMin = new Vector2(0.5f, 0f);
+            backgroundRect.anchorMax = new Vector2(0.5f, 0f);
+            backgroundRect.pivot = new Vector2(0.5f, 0f);
+            backgroundRect.sizeDelta = new Vector2(820f, 66f);
+            backgroundRect.anchoredPosition = new Vector2(0f, 14f);
+
+            Image background = backgroundObject.GetComponent<Image>();
+            background.color = new Color(0.13f, 0.15f, 0.20f, 0.92f);
+            background.raycastTarget = false;
+
+            GameObject labelObject = new GameObject(
+                "Text",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            labelObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform labelRect = (RectTransform)labelObject.transform;
+            labelRect.SetParent(backgroundRect, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(12f, 6f);
+            labelRect.offsetMax = new Vector2(-12f, -6f);
+
+            TMP_Text label = labelObject.GetComponent<TextMeshProUGUI>();
+            label.font = font;
+            label.fontSize = 22f;
+            label.color = Color.white;
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+            label.textWrappingMode = TextWrappingModes.Normal;
+            globalClueText = label;
         }
 
         public void RefreshAllNames()

@@ -70,5 +70,17 @@ namespace Murdoku
 
         public List<PuzzlePlacementData> placements = new List<PuzzlePlacementData>();
         public List<PuzzleClueData> clues = new List<PuzzleClueData>();
+
+        /// <summary>
+        /// 关卡难度：0=教程 1=简单 2=中等 3=困难 4=噩梦。
+        /// 旧存档缺省为 0（教程），兼容历史关卡。
+        /// </summary>
+        public int difficulty;
+
+        /// <summary>
+        /// 全局线索（整局提示，如「没有人单独在一个区域」）；空字符串 = 无全局线索，不显示。
+        /// 旧存档无此字段自动兼容。
+        /// </summary>
+        public string globalClue;
     }
 }

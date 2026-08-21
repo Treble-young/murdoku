@@ -41,6 +41,8 @@ namespace Murdoku.Characters
         private Button regionNameButton;
         private GameObject cluePanelRoot;
         private RectTransform clueContentRect;
+        private TMP_InputField globalClueInput;
+        private string selectedGlobalClue = string.Empty;
         private readonly List<GameObject> clueRows = new List<GameObject>();
         private readonly List<TMP_InputField> clueInputs = new List<TMP_InputField>();
         private readonly List<CharacterData> clueInputCharacters = new List<CharacterData>();
@@ -52,6 +54,12 @@ namespace Murdoku.Characters
         private readonly List<TMP_InputField> regionNameInputYs = new List<TMP_InputField>();
         private readonly List<int> regionNameIds = new List<int>();
         private bool playMode;
+        private string editingPuzzleId;
+        private int selectedDifficulty;
+        private readonly List<Button> difficultyButtons = new List<Button>();
+        private readonly List<Image> difficultyButtonImages = new List<Image>();
+        private readonly List<TMP_Text> difficultyButtonLabels = new List<TMP_Text>();
+        private static readonly string[] DifficultyNames = { "教程", "简单", "中等", "困难", "噩梦" };
         private List<PuzzlePlacementData> solutionPlacements;
 
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
@@ -68,7 +76,9 @@ namespace Murdoku.Characters
 
         private void Start()
         {
-            playMode = !string.IsNullOrEmpty(PuzzleSession.SelectedPuzzleId);
+            // 编辑模式（谜题列表点「编辑」）：载入关卡但以出题界面打开，可在此基础上修改。
+            bool editMode = PuzzleSession.EditMode;
+            playMode = !string.IsNullOrEmpty(PuzzleSession.SelectedPuzzleId) && !editMode;
             GameAudio.SetMusic(playMode ? MusicCue.Investigation : MusicCue.Main);
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
@@ -230,7 +240,8 @@ namespace Murdoku.Characters
                 return;
             }
 
-            if (PuzzleSaveManager.NameExists(puzzleName))
+            // 编辑已有关卡时允许保留原关卡名（跳过重名检查，保存会覆盖原关卡）。
+            if (string.IsNullOrEmpty(editingPuzzleId) && PuzzleSaveManager.NameExists(puzzleName))
             {
                 ShowErrorPopup("保存失败", "已存在同名关卡  " + puzzleName + "  ，请更换关卡名后再保存。");
                 return;
@@ -249,9 +260,12 @@ namespace Murdoku.Characters
             int size = testBoard.Rows;
             PuzzleData data = new PuzzleData
             {
-                id = PuzzleSaveManager.GenerateId(),
+                // 编辑模式复用原关卡 id（覆盖保存）；新建关卡才生成新 id。
+                id = string.IsNullOrEmpty(editingPuzzleId) ? PuzzleSaveManager.GenerateId() : editingPuzzleId,
                 name = puzzleName,
                 size = size,
+                difficulty = selectedDifficulty,
+                globalClue = selectedGlobalClue,
                 horizontalWalls = new bool[(size - 1) * size],
                 verticalWalls = new bool[size * (size - 1)],
                 placements = placementController.ExportPlacements(testBoard.Columns)
@@ -337,6 +351,7 @@ namespace Murdoku.Characters
         {
             string puzzleId = PuzzleSession.SelectedPuzzleId;
             PuzzleSession.SelectedPuzzleId = null;
+            PuzzleSession.EditMode = false;
 
             if (string.IsNullOrEmpty(puzzleId))
             {
@@ -348,6 +363,23 @@ namespace Murdoku.Characters
             {
                 SetStatus("未找到关卡存档，已进入空白棋盘。");
                 yield break;
+            }
+
+            // 记录当前编辑的关卡 id（保存时覆盖原关卡而非新建）并回填关卡名/难度。
+            editingPuzzleId = puzzleId;
+            if (nameInput != null)
+            {
+                nameInput.text = data.name ?? string.Empty;
+            }
+
+            selectedDifficulty = Mathf.Clamp(data.difficulty, 0, DifficultyNames.Length - 1);
+            RefreshDifficultyButtons();
+
+            // 恢复全局线索并显示在嫌疑人卡片下方（旧存档无此字段则不显示）。
+            selectedGlobalClue = data.globalClue ?? string.Empty;
+            if (placementController != null && placementController.SelectionSource != null)
+            {
+                placementController.SelectionSource.SetGlobalClue(selectedGlobalClue);
             }
 
             // 等待初始棋盘与墙体边框完成重建。
@@ -1029,6 +1061,11 @@ namespace Murdoku.Characters
             }
 
             RebuildClueRows(panel.Characters);
+            if (globalClueInput != null)
+            {
+                globalClueInput.text = selectedGlobalClue;
+            }
+
             cluePanelRoot.SetActive(true);
         }
 
@@ -1069,7 +1106,34 @@ namespace Murdoku.Characters
             clueContentRect.anchorMin = new Vector2(0f, 0f);
             clueContentRect.anchorMax = new Vector2(1f, 1f);
             clueContentRect.offsetMin = new Vector2(20f, 84f);
-            clueContentRect.offsetMax = new Vector2(-20f, -70f);
+            clueContentRect.offsetMax = new Vector2(-20f, -140f);
+
+            // 全局线索输入行（Content 顶部第一行）：整局提示，如「没有人单独在一个区域」。
+            RectTransform globalRow = CreateUiObject("GlobalClueRow", clueContentRect).GetComponent<RectTransform>();
+            globalRow.anchorMin = new Vector2(0.5f, 1f);
+            globalRow.anchorMax = new Vector2(0.5f, 1f);
+            globalRow.pivot = new Vector2(0.5f, 1f);
+            globalRow.anchoredPosition = new Vector2(0f, -12f);
+            globalRow.sizeDelta = new Vector2(720f, 56f);
+
+            TMP_Text globalLabel = CreateText("Label", globalRow, font, 20f, FontStyles.Bold);
+            globalLabel.text = "全局线索";
+            globalLabel.color = new Color(0.95f, 0.85f, 0.45f, 1f);
+            globalLabel.alignment = TextAlignmentOptions.MidlineLeft;
+            RectTransform globalLabelRect = globalLabel.rectTransform;
+            globalLabelRect.anchorMin = new Vector2(0f, 0.5f);
+            globalLabelRect.anchorMax = new Vector2(0f, 0.5f);
+            globalLabelRect.pivot = new Vector2(0f, 0.5f);
+            globalLabelRect.anchoredPosition = new Vector2(4f, 0f);
+            globalLabelRect.sizeDelta = new Vector2(130f, 40f);
+
+            globalClueInput = CreateClueInput(globalRow, font, 60);
+            RectTransform globalInputRect = globalClueInput.GetComponent<RectTransform>();
+            globalInputRect.anchorMin = new Vector2(0f, 0.5f);
+            globalInputRect.anchorMax = new Vector2(1f, 0.5f);
+            globalInputRect.pivot = new Vector2(0.5f, 0.5f);
+            globalInputRect.anchoredPosition = new Vector2(145f, 0f);
+            globalInputRect.sizeDelta = new Vector2(-290f, 44f);
 
             RectTransform applyRect = CreateUiObject("ApplyButton", panel).GetComponent<RectTransform>();
             applyRect.anchorMin = new Vector2(0.5f, 0f);
@@ -1122,7 +1186,8 @@ namespace Murdoku.Characters
                 rowRect.anchorMin = new Vector2(0.5f, 1f);
                 rowRect.anchorMax = new Vector2(0.5f, 1f);
                 rowRect.pivot = new Vector2(0.5f, 1f);
-                rowRect.anchoredPosition = new Vector2(0f, -12f - index * 64f);
+                // 第一行已被全局线索输入行占用，角色行从第二行开始。
+                rowRect.anchoredPosition = new Vector2(0f, -76f - index * 64f);
                 rowRect.sizeDelta = new Vector2(720f, 56f);
 
                 TMP_Text label = CreateText("Label", rowRect, font, 18f, FontStyles.Bold);
@@ -1210,9 +1275,16 @@ namespace Murdoku.Characters
                 character.SetClue(input.text.Trim());
             }
 
+            // 保存全局线索并刷新嫌疑人卡片下方的显示。
+            if (globalClueInput != null)
+            {
+                selectedGlobalClue = globalClueInput.text.Trim();
+            }
+
             if (placementController != null && placementController.SelectionSource != null)
             {
                 placementController.SelectionSource.RefreshAllClues();
+                placementController.SelectionSource.SetGlobalClue(selectedGlobalClue);
             }
 
             CloseCluePanel();
@@ -1746,6 +1818,7 @@ namespace Murdoku.Characters
 
             if (savePanelObject != null)
             {
+                EnsureDifficultyButtons(savePanelObject.transform);
                 savePanelObject.SetActive(!playMode);
             }
 
@@ -1829,6 +1902,71 @@ namespace Murdoku.Characters
 
             saveHint.text = message;
             saveHint.color = isError ? ErrorColor : SuccessColor;
+        }
+
+        /// <summary>
+        /// 在保存条右侧创建 5 个难度按钮（教程/简单/中等/困难/噩梦），点选高亮。
+        /// </summary>
+        private void EnsureDifficultyButtons(Transform savePanel)
+        {
+            if (difficultyButtons.Count > 0 || savePanel == null)
+            {
+                return;
+            }
+
+            TMP_FontAsset font = GetUiFont();
+            for (int index = 0; index < DifficultyNames.Length; index++)
+            {
+                int captured = index;
+                RectTransform rect = CreateUiObject("DifficultyButton_" + DifficultyNames[index], savePanel).GetComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0f, 0.5f);
+                rect.anchorMax = new Vector2(0f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.sizeDelta = new Vector2(78f, 38f);
+                rect.anchoredPosition = new Vector2(446f + index * 86f, 0f);
+
+                Image background = rect.gameObject.AddComponent<Image>();
+                Button button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = background;
+                button.onClick.AddListener(() => HandleDifficultyClicked(captured));
+                UiClickFeedback.Ensure(button);
+
+                TMP_Text label = CreateText("Label", rect, font, 28f, FontStyles.Bold);
+                label.text = DifficultyNames[index];
+                Stretch(label.rectTransform);
+
+                difficultyButtons.Add(button);
+                difficultyButtonImages.Add(background);
+                difficultyButtonLabels.Add(label);
+            }
+
+            RefreshDifficultyButtons();
+        }
+
+        private void HandleDifficultyClicked(int difficulty)
+        {
+            selectedDifficulty = Mathf.Clamp(difficulty, 0, DifficultyNames.Length - 1);
+            RefreshDifficultyButtons();
+            SetStatus("已选择难度：" + DifficultyNames[selectedDifficulty] + "。", false);
+        }
+
+        private void RefreshDifficultyButtons()
+        {
+            Color selectedColor = new Color(0.22f, 0.48f, 0.86f, 1f);
+            Color normalColor = new Color(0.85f, 0.87f, 0.90f, 1f);
+            for (int index = 0; index < difficultyButtonImages.Count; index++)
+            {
+                bool selected = index == selectedDifficulty;
+                if (difficultyButtonImages[index] != null)
+                {
+                    difficultyButtonImages[index].color = selected ? selectedColor : normalColor;
+                }
+
+                if (difficultyButtonLabels[index] != null)
+                {
+                    difficultyButtonLabels[index].color = selected ? Color.white : new Color(0.16f, 0.20f, 0.26f, 1f);
+                }
+            }
         }
 
         private void SetStatus(string message, bool isError = false)

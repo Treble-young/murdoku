@@ -9,9 +9,9 @@ public class SceneSwitch : MonoBehaviour
         SceneManager.LoadScene("CharacterPanelTest");
     }
 
-    // 返回主菜单（SampleScene 的菜单面板）
+    // 游玩模式返回：跳转到谜题列表（选关界面），而非直接回主菜单。
     public void BackToMenu()
     {
-        SceneManager.LoadScene("SampleScene");
+        SceneManager.LoadScene("LevelSelectScene");
     }
 }
