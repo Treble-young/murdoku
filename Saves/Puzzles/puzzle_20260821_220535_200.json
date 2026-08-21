@@ -7,6 +7,13 @@
         false,
         false,
         false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
         false,
         false,
         false,
@@ -14,6 +21,9 @@
         false,
         false,
         false,
+        true,
+        true,
+        true,
         false,
         false,
         false,
@@ -21,20 +31,10 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true,
+        true,
+        true,
+        true,
         false,
         false,
         false,
@@ -56,37 +56,37 @@
         false,
         false,
         false,
+        true,
         false,
         false,
         false,
         false,
         false,
+        true,
         false,
         false,
         false,
         false,
         false,
+        true,
         false,
         false,
         false,
         false,
         false,
+        true,
         false,
         false,
         false,
         false,
         false,
+        true,
         false,
         false,
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true,
         false,
         false
     ],
@@ -130,14 +130,14 @@
         0,
         0,
         0,
-        0,
         3,
         3,
+        3,
         0,
         0,
         0,
         0,
-        0,
+        3,
         3,
         3
     ],
@@ -195,6 +195,26 @@
     "forbiddenCells": [
         false,
         false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
         false,
         false,
         false,
@@ -207,34 +227,14 @@
         false,
         false,
         false,
+        true,
+        false,
+        true,
         false,
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true,
         false,
         false,
         false,
@@ -243,78 +243,105 @@
         false,
         false
     ],
-    "regionNames": [],
-    "regionNameOffsets": [],
+    "regionNames": [
+        "后院",
+        "杂物间",
+        "客厅",
+        "厨房",
+        "前院"
+    ],
+    "regionNameOffsets": [
+        {
+            "x": 120.0,
+            "y": 40.0
+        },
+        {
+            "x": 0.0,
+            "y": 40.0
+        },
+        {
+            "x": 0.0,
+            "y": 150.0
+        },
+        {
+            "x": 0.0,
+            "y": 150.0
+        },
+        {
+            "x": 120.0,
+            "y": 40.0
+        }
+    ],
     "placements": [
         {
-            "characterId": "A",
-            "cellIndex": 0
-        },
-        {
             "characterId": "B",
-            "cellIndex": 8
-        },
-        {
-            "characterId": "C",
             "cellIndex": 16
         },
         {
-            "characterId": "D",
-            "cellIndex": 24
+            "characterId": "A",
+            "cellIndex": 12
         },
         {
             "characterId": "E",
-            "cellIndex": 32
+            "cellIndex": 3
         },
         {
-            "characterId": "V",
-            "cellIndex": 48
+            "characterId": "C",
+            "cellIndex": 28
         },
         {
             "characterId": "F",
-            "cellIndex": 40
+            "cellIndex": 43
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 27
+        },
+        {
+            "characterId": "V",
+            "cellIndex": 39
         }
     ],
     "clues": [
         {
             "characterId": "A",
-            "clue": "",
+            "clue": "在杂物间里",
             "name": "Alex",
             "gender": 2
         },
         {
             "characterId": "B",
-            "clue": "",
+            "clue": "坐在客厅里，  在Dave的三面一行",
             "name": "Brian",
             "gender": 1
         },
         {
             "characterId": "C",
-            "clue": "",
+            "clue": "在电视机旁边",
             "name": "Cathy",
             "gender": 2
         },
         {
             "characterId": "D",
-            "clue": "",
+            "clue": "坐在厨房里",
             "name": "Dave",
             "gender": 1
         },
         {
             "characterId": "E",
-            "clue": "",
+            "clue": "在灌木丛旁边",
             "name": "Ella",
             "gender": 1
         },
         {
             "characterId": "F",
-            "clue": "",
+            "clue": "在Cathy右边一列，  独自一人",
             "name": "Felix",
             "gender": 1
         },
         {
             "characterId": "V",
-            "clue": "",
+            "clue": "受害者，  与凶手在同一个房间",
             "name": "Victim",
             "gender": 1
         }
