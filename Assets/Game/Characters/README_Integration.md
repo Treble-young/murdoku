@@ -56,6 +56,24 @@ toggling it off.
 The three data assets under `Data/` are placeholders for the test scene. Portraits,
 names, gender, clue text, and placeholder colors can be replaced in the Inspector.
 
+## Runtime portrait catalog
+
+`CharacterPortraitCatalog.asset` contains the reusable portrait pool. Runtime
+suspects draw a portrait without replacement, and a portrait is only assigned to
+a character with the same gender. Names are selected from the matching-gender
+name pool as well.
+
+Portrait assignments are intentionally not written to puzzle save data. Rebuilding
+the board or loading a puzzle creates a new random assignment. If imported or
+manually edited character data requests more portraits of one gender than the
+catalog provides, overflow characters use the existing initial-letter placeholder;
+the system never duplicates a portrait or assigns one with the wrong gender.
+
+Use `Tools > Murdoku > Setup Character Portraits` after replacing files under
+`Art/Portraits`. The setup command applies the UI Sprite import settings, updates
+the catalog, and keeps `CharacterSystem.prefab` connected to it without opening a
+gameplay scene.
+
 ## Test-only assets
 
 `TestBoardController`, `TestBoardCellUI`, `TestBoardCell.prefab`,

@@ -169,16 +169,54 @@ namespace Murdoku.Characters
 
         private void ClearGrid()
         {
-            UnsubscribeFromCells();
+            var generatedCells = new HashSet<TestBoardCellUI>();
             foreach (TestBoardCellUI cell in cells)
             {
                 if (cell != null)
                 {
-                    Destroy(cell.gameObject);
+                    generatedCells.Add(cell);
                 }
             }
 
+            // 域重载或编辑器验证中断后，cells 列表可能为空，但旧格子仍留在 TestGrid 下。
+            if (gridRoot != null)
+            {
+                foreach (TestBoardCellUI cell in gridRoot.GetComponentsInChildren<TestBoardCellUI>(true))
+                {
+                    if (cell != null)
+                    {
+                        generatedCells.Add(cell);
+                    }
+                }
+            }
+
+            foreach (TestBoardCellUI cell in generatedCells)
+            {
+                cell.Clicked -= HandleCellClicked;
+                cell.CharacterDropped -= HandleCharacterDropped;
+                DestroyGeneratedCell(cell.gameObject);
+            }
+
             cells.Clear();
+        }
+
+        private static void DestroyGeneratedCell(GameObject generatedCell)
+        {
+            if (generatedCell == null)
+            {
+                return;
+            }
+
+            // 先脱离 GridLayoutGroup，避免 Play Mode 同一帧重建时旧格子仍参与布局。
+            generatedCell.transform.SetParent(null, false);
+            if (Application.isPlaying)
+            {
+                Destroy(generatedCell);
+            }
+            else
+            {
+                DestroyImmediate(generatedCell);
+            }
         }
 
         private void UnsubscribeFromCells()

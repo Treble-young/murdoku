@@ -49,6 +49,11 @@ namespace Murdoku.Characters
             this.gender = gender;
         }
 
+        public void SetPortrait(Sprite sprite)
+        {
+            portrait = sprite;
+        }
+
         /// <summary>
         /// 运行时创建嫌疑人/受害者数据（不保存为 asset，用于出题器按棋盘大小动态生成）。
         /// </summary>
@@ -59,12 +64,29 @@ namespace Murdoku.Characters
             string clue,
             Color placeholderColor)
         {
+            return CreateRuntime(
+                characterId,
+                displayName,
+                gender,
+                clue,
+                placeholderColor,
+                null);
+        }
+
+        public static CharacterData CreateRuntime(
+            string characterId,
+            string displayName,
+            CharacterGender gender,
+            string clue,
+            Color placeholderColor,
+            Sprite portrait)
+        {
             CharacterData data = CreateInstance<CharacterData>();
             data.characterId = characterId;
             data.displayName = displayName;
             data.gender = gender;
             data.clue = clue;
-            data.portrait = null;
+            data.portrait = portrait;
             data.placeholderColor = placeholderColor;
             return data;
         }

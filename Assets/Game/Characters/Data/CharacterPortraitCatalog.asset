@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28317da855870f943bda57aacefe1f64, type: 3}
+  m_Name: CharacterPortraitCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.CharacterPortraitCatalog
+  entries:
+  - portraitId: portrait_01
+    gender: 1
+    portrait: {fileID: 21300000, guid: 27a6c151c0be6b64889504f1b81aee90, type: 3}
+  - portraitId: portrait_02
+    gender: 2
+    portrait: {fileID: 21300000, guid: 1019b9eb3c0114745aa8132200ea4df7, type: 3}
+  - portraitId: portrait_03
+    gender: 1
+    portrait: {fileID: 21300000, guid: c178256be5b033141ab885edaebd3b28, type: 3}
+  - portraitId: portrait_04
+    gender: 2
+    portrait: {fileID: 21300000, guid: 81395028101041b47b5ebffefea7be17, type: 3}
+  - portraitId: portrait_05
+    gender: 1
+    portrait: {fileID: 21300000, guid: 7b055e80c55dc144e9765812aa65cec3, type: 3}
+  - portraitId: portrait_06
+    gender: 1
+    portrait: {fileID: 21300000, guid: eddb1096fb0af2447a935bf7e176f9df, type: 3}
+  - portraitId: portrait_07
+    gender: 2
+    portrait: {fileID: 21300000, guid: e4faed42647a9aa4c93c8c759c77501e, type: 3}
+  - portraitId: portrait_08
+    gender: 1
+    portrait: {fileID: 21300000, guid: c332b07b7f714804c848ab7071bb09f8, type: 3}
+  - portraitId: portrait_09
+    gender: 2
+    portrait: {fileID: 21300000, guid: d8a980d32b3cfee44a1f59973b87003e, type: 3}
+  - portraitId: portrait_10
+    gender: 1
+    portrait: {fileID: 21300000, guid: 18966d4d9505e9a4a9bb6a4f994c0be4, type: 3}
+  - portraitId: portrait_11
+    gender: 2
+    portrait: {fileID: 21300000, guid: a66a72e7c63d1894aa4d370631ac51b9, type: 3}
+  - portraitId: portrait_12
+    gender: 1
+    portrait: {fileID: 21300000, guid: 020f669765b9a79419c787b9f6fe5ff5, type: 3}

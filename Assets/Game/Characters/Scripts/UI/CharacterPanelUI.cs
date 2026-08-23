@@ -11,6 +11,7 @@ namespace Murdoku.Characters
     {
         [SerializeField] private CharacterPanelView view;
         [SerializeField] private CharacterCardUI cardPrefab;
+        [SerializeField] private CharacterPortraitCatalog portraitCatalog;
         [SerializeField] private List<CharacterData> characters = new List<CharacterData>();
 
         private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
@@ -36,6 +37,8 @@ namespace Murdoku.Characters
         public bool BlackXActive => blackXActive;
 
         public IReadOnlyList<CharacterData> Characters => characters;
+
+        public CharacterPortraitCatalog PortraitCatalog => portraitCatalog;
 
         /// <summary>
         /// 把存档中的角色线索写回运行时角色数据，并刷新所有卡片的线索文本。
@@ -89,9 +92,35 @@ namespace Murdoku.Characters
                 }
             }
 
+            SuspectGenerator.RepairPortraitAssignments(characters, portraitCatalog);
+            RefreshAllPortraits();
             RefreshAllClues();
             RefreshAllNames();
             RefreshAllGenders();
+        }
+
+        public void RefreshAllPortraits()
+        {
+            foreach (CharacterCardUI card in cards)
+            {
+                if (card != null)
+                {
+                    card.RefreshPortrait();
+                }
+            }
+
+            if (board == null)
+            {
+                return;
+            }
+
+            foreach (TestBoardCellUI cell in board.Cells)
+            {
+                if (cell != null)
+                {
+                    cell.RefreshCharacterVisual();
+                }
+            }
         }
 
         public void RefreshAllGenders()
@@ -143,7 +172,7 @@ namespace Murdoku.Characters
             }
 
             RectTransform gridRect = view.CharacterGrid;
-            TMP_FontAsset font = FindFirstObjectByType<TextMeshProUGUI>().font;
+            TMP_FontAsset font = ResolvePanelFont();
 
             GameObject backgroundObject = new GameObject("GlobalClue", typeof(RectTransform), typeof(Image));
             backgroundObject.layer = LayerMask.NameToLayer("UI");
@@ -241,7 +270,7 @@ namespace Murdoku.Characters
         /// </summary>
         public void RebuildSuspects(int boardSize)
         {
-            SetCharacters(SuspectGenerator.Generate(boardSize));
+            SetCharacters(SuspectGenerator.Generate(boardSize, portraitCatalog));
             Rebuild();
         }
 
@@ -253,6 +282,11 @@ namespace Murdoku.Characters
         public void SetCardPrefab(CharacterCardUI prefab)
         {
             cardPrefab = prefab;
+        }
+
+        public void SetPortraitCatalog(CharacterPortraitCatalog catalog)
+        {
+            portraitCatalog = catalog;
         }
 
         public void SetCharacters(IEnumerable<CharacterData> characterData)
@@ -344,20 +378,45 @@ namespace Murdoku.Characters
 
             foreach (CharacterData character in characters)
             {
-                if (character == null)
+                if (character == null || IsVictim(character))
                 {
                     continue;
                 }
 
-                CharacterCardUI card = Instantiate(cardPrefab, view.CharacterGrid);
-                card.name = $"CharacterCard_{character.DisplayName}";
-                card.Bind(character, HandleCardClicked, HandleCardDragStarted);
-                card.SetGenderToggleEnabled(genderToggleEnabled);
-                card.SetPlaced(placedCharacters.Contains(character));
-                cards.Add(card);
+                CreateCharacterCard(character);
+            }
+
+            // Victim 始终位于普通人物之后，黑叉之前；即使外部传入的数据顺序有误也保持稳定布局。
+            foreach (CharacterData character in characters)
+            {
+                if (character == null || !IsVictim(character))
+                {
+                    continue;
+                }
+
+                CreateCharacterCard(character);
             }
 
             CreateBlackXCard();
+        }
+
+        private void CreateCharacterCard(CharacterData character)
+        {
+            CharacterCardUI card = Instantiate(cardPrefab, view.CharacterGrid);
+            card.name = $"CharacterCard_{character.DisplayName}";
+            card.Bind(
+                character,
+                HandleCardClicked,
+                HandleCardDragStarted,
+                HandleCardGenderChanged);
+            card.SetGenderToggleEnabled(genderToggleEnabled);
+            card.SetPlaced(placedCharacters.Contains(character));
+            cards.Add(card);
+        }
+
+        private static bool IsVictim(CharacterData character)
+        {
+            return string.Equals(character.CharacterId, "V", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -372,7 +431,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            TMP_FontAsset font = FindFirstObjectByType<TextMeshProUGUI>().font;
+            TMP_FontAsset font = ResolvePanelFont();
             Color darkText = new Color(0.16f, 0.20f, 0.26f, 1f);
 
             blackXCard = new GameObject("BlackXCard", typeof(RectTransform), typeof(Image));
@@ -437,6 +496,22 @@ namespace Murdoku.Characters
 
             BlackXCardHandler handler = blackXCard.AddComponent<BlackXCardHandler>();
             handler.Clicked = ToggleBlackX;
+            root.SetAsLastSibling();
+        }
+
+        private TMP_FontAsset ResolvePanelFont()
+        {
+            TextMeshProUGUI panelText =
+                view == null ? null : view.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (panelText != null && panelText.font != null)
+            {
+                return panelText.font;
+            }
+
+            TextMeshProUGUI sceneText = FindFirstObjectByType<TextMeshProUGUI>();
+            return sceneText != null && sceneText.font != null
+                ? sceneText.font
+                : TMP_Settings.defaultFontAsset;
         }
 
         /// <summary>创建选中边框的一条边（细条 Image）。</summary>
@@ -615,6 +690,12 @@ namespace Murdoku.Characters
             }
         }
 
+        private void HandleCardGenderChanged(CharacterCardUI card)
+        {
+            SuspectGenerator.RepairPortraitAssignments(characters, portraitCatalog);
+            RefreshAllPortraits();
+        }
+
         private void SelectCard(CharacterCardUI card)
         {
             // 选中角色时退出黑叉模式（互斥）。
@@ -641,11 +722,10 @@ namespace Murdoku.Characters
                 BlackXModeChanged?.Invoke(false);
             }
 
-            if (blackXCard != null)
+            if (blackXScaleRoutine != null)
             {
-                Destroy(blackXCard);
-                blackXCard = null;
-                blackXBorder = null;
+                StopCoroutine(blackXScaleRoutine);
+                blackXScaleRoutine = null;
             }
 
             if (selectedCard != null)
@@ -654,15 +734,62 @@ namespace Murdoku.Characters
                 SelectionChanged?.Invoke(null);
             }
 
+            var generatedObjects = new HashSet<GameObject>();
             foreach (CharacterCardUI card in cards)
             {
                 if (card != null)
                 {
-                    Destroy(card.gameObject);
+                    generatedObjects.Add(card.gameObject);
                 }
             }
 
+            if (blackXCard != null)
+            {
+                generatedObjects.Add(blackXCard);
+            }
+
+            // 域重载或编辑器验证中断后，运行时列表会丢失，但生成对象仍可能留在层级中。
+            // 扫描网格的直接子节点，确保旧人物卡和旧黑叉不会与新一轮生成结果叠加。
+            if (view != null && view.CharacterGrid != null)
+            {
+                Transform grid = view.CharacterGrid;
+                for (int index = grid.childCount - 1; index >= 0; index--)
+                {
+                    Transform child = grid.GetChild(index);
+                    if (child.GetComponent<CharacterCardUI>() != null || child.name == "BlackXCard")
+                    {
+                        generatedObjects.Add(child.gameObject);
+                    }
+                }
+            }
+
+            foreach (GameObject generatedObject in generatedObjects)
+            {
+                DestroyGeneratedObject(generatedObject);
+            }
+
             cards.Clear();
+            blackXCard = null;
+            blackXBorder = null;
+        }
+
+        private static void DestroyGeneratedObject(GameObject generatedObject)
+        {
+            if (generatedObject == null)
+            {
+                return;
+            }
+
+            // Play Mode 的 Destroy 延迟到帧末执行；先脱离 GridLayoutGroup，避免同一帧出现重复布局。
+            generatedObject.transform.SetParent(null, false);
+            if (Application.isPlaying)
+            {
+                Destroy(generatedObject);
+            }
+            else
+            {
+                DestroyImmediate(generatedObject);
+            }
         }
     }
 }

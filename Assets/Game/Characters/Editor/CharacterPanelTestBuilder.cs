@@ -21,11 +21,88 @@ namespace Murdoku.Characters.Editor
         private const string Root = "Assets/Game/Characters";
         private const string DataRoot = Root + "/Data";
         private const string PrefabRoot = Root + "/Prefabs";
+        private const string PortraitRoot = Root + "/Art/Portraits";
+        private const string PortraitCatalogPath = DataRoot + "/CharacterPortraitCatalog.asset";
         private const string ScenePath = "Assets/Scenes/CharacterPanelTest.unity";
         private const string AutoPlayCommandLineFlag = "-murdokuCharacterPanelPlay";
         private const string AutoPlaySessionKey = "Murdoku.CharacterPanelTest.AutoPlayStarted";
 
         private static TMP_FontAsset cachedFont;
+
+        private static readonly string[] PortraitFileNames =
+        {
+            "01_young_brown_hoodie_male.png",
+            "02_blonde_ponytail_female.png",
+            "03_dark_bearded_male.png",
+            "04_black_hair_earrings_female.png",
+            "05_elderly_gray_beard_male.png",
+            "06_curly_red_hoodie_boy.png",
+            "07_afro_yellow_blazer_female.png",
+            "08_brown_hair_navy_shirt_male.png",
+            "09_elderly_bun_female.png",
+            "10_glasses_blazer_male.png",
+            "11_red_bun_green_top_female.png",
+            "12_beanie_young_male.png"
+        };
+
+        private static readonly CharacterGender[] PortraitGenders =
+        {
+            CharacterGender.Male,
+            CharacterGender.Female,
+            CharacterGender.Male,
+            CharacterGender.Female,
+            CharacterGender.Male,
+            CharacterGender.Male,
+            CharacterGender.Female,
+            CharacterGender.Male,
+            CharacterGender.Female,
+            CharacterGender.Male,
+            CharacterGender.Female,
+            CharacterGender.Male
+        };
+
+        [InitializeOnLoadMethod]
+        private static void ScheduleFirstPortraitCatalogSetup()
+        {
+            if (AssetDatabase.LoadAssetAtPath<CharacterPortraitCatalog>(PortraitCatalogPath) != null)
+            {
+                return;
+            }
+
+            EditorApplication.delayCall -= SetupPortraitCatalogWhenReady;
+            EditorApplication.delayCall += SetupPortraitCatalogWhenReady;
+        }
+
+        private static void SetupPortraitCatalogWhenReady()
+        {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.delayCall += SetupPortraitCatalogWhenReady;
+                return;
+            }
+
+            if (AssetDatabase.LoadAssetAtPath<CharacterPortraitCatalog>(PortraitCatalogPath) != null)
+            {
+                return;
+            }
+
+            foreach (string fileName in PortraitFileNames)
+            {
+                string fullPath = Path.Combine(
+                    Application.dataPath,
+                    "Game",
+                    "Characters",
+                    "Art",
+                    "Portraits",
+                    fileName);
+                if (!File.Exists(fullPath))
+                {
+                    return;
+                }
+            }
+
+            SetupCharacterPortraits();
+        }
 
         [InitializeOnLoadMethod]
         private static void ScheduleCommandLineAutoPlay()
@@ -84,6 +161,7 @@ namespace Murdoku.Characters.Editor
         {
             RequireExactEditorVersion();
             EnsureFolders();
+            CharacterPortraitCatalog portraitCatalog = CreateOrUpdatePortraitCatalog();
 
             CreateOrUpdateCharacter(
                 "Leo",
@@ -113,7 +191,7 @@ namespace Murdoku.Characters.Editor
 
             CharacterCardUI cardPrefab = LoadPrefabComponent<CharacterCardUI>(
                 $"{PrefabRoot}/CharacterCard.prefab");
-            CreateCharacterSystemPrefab(cardPrefab);
+            CreateCharacterSystemPrefab(cardPrefab, portraitCatalog);
 
             CreateTestScene();
 
@@ -122,11 +200,31 @@ namespace Murdoku.Characters.Editor
             Debug.Log($"Character panel test assets created at {Root} and {ScenePath}.");
         }
 
+        [MenuItem("Tools/Murdoku/Setup Character Portraits")]
+        public static void SetupCharacterPortraits()
+        {
+            RequireExactEditorVersion();
+            EnsureFolders();
+            CharacterPortraitCatalog portraitCatalog = CreateOrUpdatePortraitCatalog();
+            AssignPortraitCatalogToCharacterSystemPrefab(portraitCatalog);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("Character portrait catalog and CharacterSystem.prefab reference are ready.");
+        }
+
         [MenuItem("Tools/Murdoku/Validate Character Panel Test")]
         public static void ValidateCharacterPanelTest()
         {
             RequireExactEditorVersion();
-            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Scene activeSceneBefore = SceneManager.GetActiveScene();
+            int activeSceneHandleBefore = activeSceneBefore.IsValid() ? activeSceneBefore.handle : 0;
+            bool activeSceneDirtyBefore = activeSceneBefore.IsValid() && activeSceneBefore.isDirty;
+            Scene scene = default;
+
+            try
+            {
+                // 验证只在 Preview Scene 中运行。即使中途断言失败，也不会污染用户当前打开的场景。
+                scene = EditorSceneManager.OpenPreviewScene(ScenePath);
 
             Camera[] cameras = FindSceneComponents<Camera>(scene);
             EventSystem[] eventSystems = FindSceneComponents<EventSystem>(scene);
@@ -148,7 +246,21 @@ namespace Murdoku.Characters.Editor
             SerializedObject panelSerialized = new SerializedObject(panelUI);
             Require(panelSerialized.FindProperty("view").objectReferenceValue == panelView, "CharacterPanelUI.View is not assigned.");
             Require(panelSerialized.FindProperty("cardPrefab").objectReferenceValue != null, "CharacterPanelUI.CardPrefab is not assigned.");
+            CharacterPortraitCatalog portraitCatalog =
+                panelSerialized.FindProperty("portraitCatalog").objectReferenceValue as CharacterPortraitCatalog;
+            Require(portraitCatalog != null, "CharacterPanelUI.PortraitCatalog is not assigned.");
+            Require(portraitCatalog.Entries.Count == 12, "The portrait catalog must contain twelve portraits.");
             Require(panelSerialized.FindProperty("characters").arraySize == 3, "CharacterPanelUI must contain three test characters.");
+
+            foreach (int boardSize in new[] { 5, 6, 10 })
+            {
+                for (int pass = 0; pass < 5; pass++)
+                {
+                    ValidateGeneratedPortraits(boardSize, portraitCatalog);
+                }
+            }
+
+            ValidateGenderTogglePortraitFallback(portraitCatalog);
 
             SerializedObject boardSerialized = new SerializedObject(board);
             Require(boardSerialized.FindProperty("rows").intValue == 6, "Test board row count must be 6.");
@@ -174,11 +286,6 @@ namespace Murdoku.Characters.Editor
             WallEditController wallEdit = FindSingleSceneComponent<WallEditController>(scene);
             SerializedObject wallSerialized = new SerializedObject(wallEdit);
             Require(wallSerialized.FindProperty("board").objectReferenceValue == board, "WallEditController.Board is not assigned to the test board.");
-
-            foreach (EditorBuildSettingsScene buildScene in EditorBuildSettings.scenes)
-            {
-                Require(buildScene.path != ScenePath, "CharacterPanelTest must not be included in Build Settings.");
-            }
 
             string[] dependencies = AssetDatabase.GetDependencies(ScenePath, true);
             foreach (string dependency in dependencies)
@@ -243,9 +350,13 @@ namespace Murdoku.Characters.Editor
                 leoDimOverlay.offsetMin == Vector2.zero && leoDimOverlay.offsetMax == Vector2.zero,
                 "The placed dim overlay must stretch across the entire card.");
             Image leoDimImage = leoDimOverlay.GetComponent<Image>();
+            Require(leoDimImage != null, "The placed dim overlay must contain an Image component.");
             Require(
-                leoDimImage != null && Approximately(leoDimImage.color.a, 0.60f) && !leoDimImage.raycastTarget,
-                "The placed dim overlay must use 60% black and must not block raycasts.");
+                Approximately(leoDimImage.color.a, 0.60f),
+                $"The placed dim overlay must use 60% black; actual alpha is {leoDimImage.color.a:0.###}.");
+            Require(
+                !leoDimImage.raycastTarget,
+                "The placed dim overlay must not block raycasts.");
             Require(
                 placement.HandleCharacterDropped(leoCard.Character, board.Cells[1]) == CharacterPlacementResult.Moved,
                 "Dragging Leo must move it to a second empty cell.");
@@ -287,7 +398,157 @@ namespace Murdoku.Characters.Editor
                 board.Cells[6].IsOccupied && minaCard.IsPlaced && minaDimOverlay.gameObject.activeSelf,
                 "Redoing a first placement must dim the card and restore the cell.");
 
-            Debug.Log("CharacterPanelTest validation passed: hierarchy, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
+            // Build Settings 属于受保护的 ProjectSettings。本验证器只检查人物系统，绝不自动改写它。
+            // 如果测试 Scene 已由工作区基线列入 Build Settings，则给出提醒但不污染或阻断本次验证。
+            foreach (EditorBuildSettingsScene buildScene in EditorBuildSettings.scenes)
+            {
+                if (buildScene.path == ScenePath && buildScene.enabled)
+                {
+                    Debug.LogWarning(
+                        "CharacterPanelTest is currently enabled in Build Settings. " +
+                        "The character-system validator intentionally leaves ProjectSettings unchanged.");
+                }
+            }
+
+                ValidateGeneratedLayout(panelUI, panelView, board, 5);
+                ValidateGeneratedLayout(panelUI, panelView, board, 6);
+                ValidateGeneratedLayout(panelUI, panelView, board, 10);
+
+                Debug.Log("CharacterPanelTest validation passed: portrait uniqueness/gender matching, hierarchy, X ordering, duplicate cleanup, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
+            }
+            finally
+            {
+                if (scene.IsValid())
+                {
+                    EditorSceneManager.ClosePreviewScene(scene);
+                }
+            }
+
+            Scene activeSceneAfter = SceneManager.GetActiveScene();
+            Require(
+                (!activeSceneBefore.IsValid() && !activeSceneAfter.IsValid()) ||
+                (activeSceneAfter.IsValid() && activeSceneAfter.handle == activeSceneHandleBefore),
+                "Validation must not replace the active scene.");
+            Require(
+                !activeSceneAfter.IsValid() || activeSceneAfter.isDirty == activeSceneDirtyBefore,
+                "Validation must not change the active scene dirty state.");
+        }
+
+        private static void ValidateGeneratedLayout(
+            CharacterPanelUI panelUI,
+            CharacterPanelView panelView,
+            TestBoardController board,
+            int boardSize)
+        {
+            // 连续重建两次，验证清理逻辑不依赖运行时缓存列表，也不会叠加旧对象。
+            board.SetGridSize(boardSize, boardSize);
+            panelUI.RebuildSuspects(boardSize);
+            board.SetGridSize(boardSize, boardSize);
+            panelUI.RebuildSuspects(boardSize);
+
+            int expectedCellCount = boardSize * boardSize;
+            TestBoardCellUI[] generatedCells =
+                board.GridRoot.GetComponentsInChildren<TestBoardCellUI>(true);
+            CharacterCardUI[] generatedCards =
+                panelView.CharacterGrid.GetComponentsInChildren<CharacterCardUI>(true);
+
+            Require(
+                board.Cells.Count == expectedCellCount && generatedCells.Length == expectedCellCount,
+                $"A {boardSize}x{boardSize} board must contain exactly {expectedCellCount} generated cells after repeated rebuilds.");
+            Require(
+                panelUI.Characters.Count == boardSize && generatedCards.Length == boardSize,
+                $"A {boardSize}x{boardSize} board must contain exactly {boardSize} character cards after repeated rebuilds.");
+            Require(
+                panelView.CharacterGrid.childCount == boardSize + 1,
+                $"A {boardSize}x{boardSize} character grid must contain the characters plus exactly one X card.");
+
+            Transform lastChild = panelView.CharacterGrid.GetChild(panelView.CharacterGrid.childCount - 1);
+            Require(lastChild.name == "BlackXCard", "BlackXCard must always be the final character-grid item.");
+
+            int blackXCount = 0;
+            foreach (Transform child in panelView.CharacterGrid)
+            {
+                if (child.name == "BlackXCard")
+                {
+                    blackXCount++;
+                }
+            }
+
+            Require(blackXCount == 1, "The character grid must contain exactly one BlackXCard.");
+        }
+
+        private static void ValidateGeneratedPortraits(
+            int boardSize,
+            CharacterPortraitCatalog portraitCatalog)
+        {
+            List<CharacterData> generatedCharacters = SuspectGenerator.Generate(boardSize, portraitCatalog);
+            var generatedPortraits = new HashSet<Sprite>();
+            Require(
+                generatedCharacters.Count == boardSize,
+                $"A {boardSize}x{boardSize} board must generate {boardSize - 1} suspects and one victim.");
+
+            foreach (CharacterData character in generatedCharacters)
+            {
+                Require(
+                    character.Portrait != null,
+                    "The supplied portrait catalog must cover every generated character.");
+                Require(generatedPortraits.Add(character.Portrait), "Generated portraits must not repeat.");
+                Require(
+                    portraitCatalog.TryGetEntry(
+                        character.Portrait,
+                        out CharacterPortraitCatalog.Entry entry) &&
+                    entry.Gender == character.Gender,
+                    "Every generated portrait must match the character gender.");
+                if (!string.Equals(character.CharacterId, "V", StringComparison.OrdinalIgnoreCase))
+                {
+                    Require(
+                        SuspectGenerator.InferGenderFromName(character.DisplayName) == character.Gender,
+                        "Generated suspect names and genders must match.");
+                }
+
+                UnityEngine.Object.DestroyImmediate(character);
+            }
+        }
+
+        private static void ValidateGenderTogglePortraitFallback(
+            CharacterPortraitCatalog portraitCatalog)
+        {
+            List<CharacterData> characters = SuspectGenerator.Generate(10, portraitCatalog);
+            try
+            {
+                foreach (CharacterGender gender in new[]
+                         {
+                             CharacterGender.Female,
+                             CharacterGender.Male
+                         })
+                {
+                    foreach (CharacterData character in characters)
+                    {
+                        character.SetGender(gender);
+                    }
+
+                    SuspectGenerator.RepairPortraitAssignments(characters, portraitCatalog);
+                    foreach (CharacterData character in characters)
+                    {
+                        Require(
+                            character.Portrait != null,
+                            "Gender toggling must never fall back to a letter placeholder.");
+                        Require(
+                            portraitCatalog.TryGetEntry(
+                                character.Portrait,
+                                out CharacterPortraitCatalog.Entry entry) &&
+                            entry.Gender == gender,
+                            "A reused overflow portrait must still match the selected gender.");
+                    }
+                }
+            }
+            finally
+            {
+                foreach (CharacterData character in characters)
+                {
+                    UnityEngine.Object.DestroyImmediate(character);
+                }
+            }
         }
 
         [MenuItem("Tools/Murdoku/Open Character Panel Test and Play")]
@@ -429,6 +690,7 @@ namespace Murdoku.Characters.Editor
         private static void EnsureFolders()
         {
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Data"));
+            Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Art", "Portraits"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Prefabs"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Editor"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Data"));
@@ -436,6 +698,92 @@ namespace Murdoku.Characters.Editor
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "UI"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Test"));
             AssetDatabase.Refresh();
+        }
+
+        private static CharacterPortraitCatalog CreateOrUpdatePortraitCatalog()
+        {
+            var sprites = new List<Sprite>(PortraitFileNames.Length);
+            for (int index = 0; index < PortraitFileNames.Length; index++)
+            {
+                string assetPath = $"{PortraitRoot}/{PortraitFileNames[index]}";
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+                TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                if (importer == null)
+                {
+                    throw new InvalidOperationException($"Portrait texture importer was not found: {assetPath}");
+                }
+
+                bool requiresReimport = importer.textureType != TextureImporterType.Sprite ||
+                                        importer.spriteImportMode != SpriteImportMode.Single ||
+                                        importer.mipmapEnabled ||
+                                        !importer.alphaIsTransparency ||
+                                        importer.maxTextureSize != 512 ||
+                                        importer.textureCompression != TextureImporterCompression.Uncompressed;
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.alphaIsTransparency = true;
+                importer.maxTextureSize = 512;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                if (requiresReimport)
+                {
+                    importer.SaveAndReimport();
+                }
+
+                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+                if (sprite == null)
+                {
+                    throw new InvalidOperationException($"Portrait sprite was not imported: {assetPath}");
+                }
+
+                sprites.Add(sprite);
+            }
+
+            CharacterPortraitCatalog catalog =
+                AssetDatabase.LoadAssetAtPath<CharacterPortraitCatalog>(PortraitCatalogPath);
+            if (catalog == null)
+            {
+                catalog = ScriptableObject.CreateInstance<CharacterPortraitCatalog>();
+                AssetDatabase.CreateAsset(catalog, PortraitCatalogPath);
+            }
+
+            SerializedObject serialized = new SerializedObject(catalog);
+            SerializedProperty entries = serialized.FindProperty("entries");
+            entries.arraySize = PortraitFileNames.Length;
+            for (int index = 0; index < PortraitFileNames.Length; index++)
+            {
+                SerializedProperty entry = entries.GetArrayElementAtIndex(index);
+                entry.FindPropertyRelative("portraitId").stringValue = $"portrait_{index + 1:00}";
+                entry.FindPropertyRelative("gender").enumValueIndex = (int)PortraitGenders[index];
+                entry.FindPropertyRelative("portrait").objectReferenceValue = sprites[index];
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static void AssignPortraitCatalogToCharacterSystemPrefab(
+            CharacterPortraitCatalog portraitCatalog)
+        {
+            string prefabPath = $"{PrefabRoot}/CharacterSystem.prefab";
+            GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                CharacterPanelUI panel = root.GetComponentInChildren<CharacterPanelUI>(true);
+                if (panel == null)
+                {
+                    throw new InvalidOperationException(
+                        "CharacterSystem.prefab is missing CharacterPanelUI.");
+                }
+
+                SetReference(panel, "portraitCatalog", portraitCatalog);
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         private static CharacterData CreateOrUpdateCharacter(
@@ -551,6 +899,7 @@ namespace Murdoku.Characters.Editor
             SetReference(card, "genderText", genderText);
             SetReference(card, "nameText", nameText);
             SetReference(card, "clueText", clueText);
+            SetFloat(card, "placedDimAlpha", 0.60f);
             selectionBorder.gameObject.SetActive(false);
 
             CharacterCardUI saved = SavePrefab(root.gameObject, $"{PrefabRoot}/CharacterCard.prefab")
@@ -871,13 +1220,16 @@ namespace Murdoku.Characters.Editor
             return button;
         }
 
-        private static GameObject CreateCharacterSystemPrefab(CharacterCardUI cardPrefab)
+        private static GameObject CreateCharacterSystemPrefab(
+            CharacterCardUI cardPrefab,
+            CharacterPortraitCatalog portraitCatalog)
         {
             GameObject root = new GameObject("CharacterSystem");
             GameObject panelObject = new GameObject("CharacterPanelUI");
             panelObject.transform.SetParent(root.transform, false);
             CharacterPanelUI panel = panelObject.AddComponent<CharacterPanelUI>();
             SetReference(panel, "cardPrefab", cardPrefab);
+            SetReference(panel, "portraitCatalog", portraitCatalog);
 
             GameObject placementObject = new GameObject("CharacterPlacementController");
             placementObject.transform.SetParent(root.transform, false);

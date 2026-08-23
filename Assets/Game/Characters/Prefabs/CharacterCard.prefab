@@ -682,6 +682,7 @@ MonoBehaviour:
   genderText: {fileID: 3073112193838194850}
   nameText: {fileID: 2433266180741094158}
   clueText: {fileID: 2635262708431148462}
+  placedDimAlpha: 0.6
   selectedScale: 1.1
   animationDuration: 0.15
 --- !u!1 &5820831675402170598

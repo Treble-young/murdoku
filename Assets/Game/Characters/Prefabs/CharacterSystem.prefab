@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.CharacterPanelUI
   view: {fileID: 0}
   cardPrefab: {fileID: 268929734312701675, guid: 2367ca521abba8048a1bf50dc64c57e2, type: 3}
+  portraitCatalog: {fileID: 11400000, guid: b918d35b130cb094e9d5496bd8eb2932, type: 2}
   characters: []
 --- !u!1 &3684557368655290381
 GameObject:

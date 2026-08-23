@@ -56,6 +56,11 @@ namespace Murdoku.Characters
         public bool IsOccupied => currentCharacter != null;
         public CharacterData CurrentCharacter => currentCharacter;
 
+        public void RefreshCharacterVisual()
+        {
+            RefreshToken();
+        }
+
         /// <summary>是否禁止放置人物（出题人禁放规则 + 游玩玩家标记任一为真）。</summary>
         public bool IsForbidden => editorForbidden || playerMarked;
 

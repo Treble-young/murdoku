@@ -39,6 +39,7 @@ namespace Murdoku.Characters
         private CharacterData character;
         private Action<CharacterCardUI> clicked;
         private Action<CharacterCardUI> dragStarted;
+        private Action<CharacterCardUI> genderChanged;
         private Coroutine scaleRoutine;
         private RectTransform genderCircleRect;
         private TMP_Text genderSymbolText;
@@ -88,6 +89,33 @@ namespace Murdoku.Characters
         public void RefreshGender()
         {
             UpdateGenderVisual();
+        }
+
+        public void RefreshPortrait()
+        {
+            if (character == null)
+            {
+                return;
+            }
+
+            bool hasPortrait = character.Portrait != null;
+            if (portraitImage != null)
+            {
+                portraitImage.sprite = character.Portrait;
+                portraitImage.enabled = hasPortrait;
+            }
+
+            if (portraitPlaceholder != null)
+            {
+                portraitPlaceholder.color = character.PlaceholderColor;
+                portraitPlaceholder.gameObject.SetActive(!hasPortrait);
+            }
+
+            if (initialText != null)
+            {
+                initialText.text = character.Initial;
+                initialText.gameObject.SetActive(!hasPortrait);
+            }
         }
 
         private void Awake()
@@ -204,6 +232,7 @@ namespace Murdoku.Characters
             GameAudio.Play(SfxCue.UiClick);
             character.ToggleGender();
             UpdateGenderVisual();
+            genderChanged?.Invoke(this);
         }
 
         /// <summary>
@@ -248,11 +277,13 @@ namespace Murdoku.Characters
         public void Bind(
             CharacterData data,
             Action<CharacterCardUI> onClicked,
-            Action<CharacterCardUI> onDragStarted = null)
+            Action<CharacterCardUI> onDragStarted = null,
+            Action<CharacterCardUI> onGenderChanged = null)
         {
             character = data;
             clicked = onClicked;
             dragStarted = onDragStarted;
+            genderChanged = onGenderChanged;
             SetPlaced(false);
 
             if (data == null)
@@ -260,24 +291,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            bool hasPortrait = data.Portrait != null;
-            if (portraitImage != null)
-            {
-                portraitImage.sprite = data.Portrait;
-                portraitImage.enabled = hasPortrait;
-            }
-
-            if (portraitPlaceholder != null)
-            {
-                portraitPlaceholder.color = data.PlaceholderColor;
-                portraitPlaceholder.gameObject.SetActive(!hasPortrait);
-            }
-
-            if (initialText != null)
-            {
-                initialText.text = data.Initial;
-                initialText.gameObject.SetActive(!hasPortrait);
-            }
+            RefreshPortrait();
 
             if (genderText != null)
             {
