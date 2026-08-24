@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -7,8 +8,11 @@ using UnityEngine.UI;
 namespace Murdoku.Characters
 {
     public sealed class TestBoardCellUI : MonoBehaviour, ICharacterPlacementCell,
-        IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
+        IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler,
+        IPointerDownHandler, IPointerUpHandler
     {
+        private const float LongPressSeconds = 0.45f;
+
         [Header("Cell")]
         [SerializeField] private Button button;
         [SerializeField] private Image backgroundImage;
@@ -47,8 +51,13 @@ namespace Murdoku.Characters
         private bool editorForbidden;
         private bool playerMarked;
         private TMP_Text forbiddenMark;
+        private readonly List<CharacterData> candidateMarks = new List<CharacterData>();
+        private readonly List<GameObject> candidateMarkChips = new List<GameObject>();
+        private float pressStartTime;
+        private bool suppressClick;
 
         public event Action<ICharacterPlacementCell> Clicked;
+        public event Action<ICharacterPlacementCell> LongPressed;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
         public Vector2Int GridPosition => gridPosition;
@@ -97,7 +106,172 @@ namespace Murdoku.Characters
             propIndex = -1;
             editorForbidden = false;
             playerMarked = false;
+            candidateMarks.Clear();
+            RebuildCandidateMarkVisual();
             Refresh();
+        }
+
+        /// <summary>
+        /// 游玩模式候选标记：为选中人物在该格打/取消一个暗色人物图标候选（推理辅助，不保存）。
+        /// 返回 true 表示新增标记，false 表示取消标记。
+        /// </summary>
+        public bool ToggleCandidateMark(CharacterData character)
+        {
+            if (character == null)
+            {
+                return false;
+            }
+
+            bool added;
+            if (candidateMarks.Contains(character))
+            {
+                candidateMarks.Remove(character);
+                added = false;
+            }
+            else
+            {
+                candidateMarks.Add(character);
+                added = true;
+            }
+
+            RebuildCandidateMarkVisual();
+            return added;
+        }
+
+        public void RemoveCandidateMark(CharacterData character)
+        {
+            if (character == null)
+            {
+                return;
+            }
+
+            if (candidateMarks.Remove(character))
+            {
+                RebuildCandidateMarkVisual();
+            }
+        }
+
+        public void ClearCandidateMarks()
+        {
+            if (candidateMarks.Count == 0)
+            {
+                return;
+            }
+
+            candidateMarks.Clear();
+            RebuildCandidateMarkVisual();
+        }
+
+        public bool HasCandidateMark(CharacterData character)
+        {
+            return character != null && candidateMarks.Contains(character);
+        }
+
+        /// <summary>该格是否存在任意候选标记（用于行列占用提示）。</summary>
+        public bool HasAnyCandidateMark => candidateMarks.Count > 0;
+
+        private void RebuildCandidateMarkVisual()
+        {
+            foreach (GameObject chip in candidateMarkChips)
+            {
+                if (chip != null)
+                {
+                    Destroy(chip);
+                }
+            }
+
+            candidateMarkChips.Clear();
+
+            RectTransform cellRect = (RectTransform)transform;
+            float cellSize = Mathf.Min(cellRect.rect.width, cellRect.rect.height);
+            float chipSize = Mathf.Clamp(cellSize * 0.8f, 40f, 75f);
+            float x = 2f;
+            for (int index = 0; index < candidateMarks.Count; index++)
+            {
+                CharacterData character = candidateMarks[index];
+                bool hasPortrait = character != null && character.Portrait != null;
+
+                GameObject chip = new GameObject(
+                    "MarkChip",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                chip.layer = LayerMask.NameToLayer("UI");
+                RectTransform chipRect = chip.GetComponent<RectTransform>();
+                chipRect.SetParent(transform, false);
+                chipRect.anchorMin = new Vector2(0f, 1f);
+                chipRect.anchorMax = new Vector2(0f, 1f);
+                chipRect.pivot = new Vector2(0f, 1f);
+                chipRect.anchoredPosition = new Vector2(x, -2f);
+                chipRect.sizeDelta = new Vector2(chipSize, chipSize);
+
+                Image chipImage = chip.GetComponent<Image>();
+                chipImage.raycastTarget = false;
+                if (hasPortrait)
+                {
+                    chipImage.sprite = character.Portrait;
+                    chipImage.color = new Color(1f, 1f, 1f, 0.45f);
+                }
+                else
+                {
+                    Color baseColor = character == null ? Color.gray : character.PlaceholderColor;
+                    chipImage.color = new Color(
+                        baseColor.r * 0.7f,
+                        baseColor.g * 0.7f,
+                        baseColor.b * 0.7f,
+                        0.38f);
+                }
+
+                if (!hasPortrait && character != null && character.Initial.Length > 0)
+                {
+                    GameObject labelObject = new GameObject(
+                        "Initial",
+                        typeof(RectTransform),
+                        typeof(CanvasRenderer),
+                        typeof(TextMeshProUGUI));
+                    RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+                    labelRect.SetParent(chipRect, false);
+                    labelRect.anchorMin = Vector2.zero;
+                    labelRect.anchorMax = Vector2.one;
+                    labelRect.offsetMin = Vector2.zero;
+                    labelRect.offsetMax = Vector2.zero;
+
+                    TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+                    if (coordinateText != null)
+                    {
+                        label.font = coordinateText.font;
+                    }
+
+                    label.text = character.Initial;
+                    label.fontSize = Mathf.Max(9f, chipSize * 0.5f);
+                    label.fontStyle = FontStyles.Bold;
+                    label.alignment = TextAlignmentOptions.Center;
+                    label.color = new Color(1f, 1f, 1f, 0.55f);
+                    label.raycastTarget = false;
+                }
+
+                candidateMarkChips.Add(chip);
+                x += chipSize + 2f;
+            }
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            pressStartTime = Time.unscaledTime;
+            suppressClick = false;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (Time.unscaledTime - pressStartTime >= LongPressSeconds &&
+                RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)transform,
+                    eventData.position,
+                    eventData.pressEventCamera))
+            {
+                suppressClick = true;
+                LongPressed?.Invoke(this);
+            }
         }
 
         /// <summary>
@@ -382,6 +556,7 @@ namespace Murdoku.Characters
             }
 
             currentCharacter = character;
+            ClearCandidateMarks();
             RefreshToken();
             return true;
         }
@@ -521,6 +696,12 @@ namespace Murdoku.Characters
 
         private void HandleButtonClicked()
         {
+            if (suppressClick)
+            {
+                suppressClick = false;
+                return;
+            }
+
             Clicked?.Invoke(this);
         }
     }

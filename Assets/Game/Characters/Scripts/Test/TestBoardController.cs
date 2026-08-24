@@ -29,6 +29,7 @@ namespace Murdoku.Characters
         private readonly List<TestBoardCellUI> cells = new List<TestBoardCellUI>();
 
         public event Action<ICharacterPlacementCell> CellClicked;
+        public event Action<ICharacterPlacementCell> CellLongPressed;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
         /// <summary>棋盘重建完成后触发，参数为 (行数, 列数)。</summary>
@@ -52,7 +53,7 @@ namespace Murdoku.Characters
 
             foreach (TestBoardCellUI cell in cells)
             {
-                if (cell == null || !cell.IsOccupied)
+                if (cell == null || (!cell.IsOccupied && !cell.HasAnyCandidateMark))
                 {
                     continue;
                 }
@@ -128,6 +129,7 @@ namespace Murdoku.Characters
                     cell.name = $"TestCell_{column}_{row}";
                     cell.Configure(position, !blocked.Contains(position));
                     cell.Clicked += HandleCellClicked;
+                    cell.LongPressed += HandleCellLongPressed;
                     cell.CharacterDropped += HandleCharacterDropped;
                     cells.Add(cell);
                 }
@@ -226,7 +228,22 @@ namespace Murdoku.Characters
                 if (cell != null)
                 {
                     cell.Clicked -= HandleCellClicked;
+                    cell.LongPressed -= HandleCellLongPressed;
                     cell.CharacterDropped -= HandleCharacterDropped;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 人物放置后清空该人物在整张棋盘上的候选标记，避免残留干扰推理。
+        /// </summary>
+        public void ClearCandidateMarksFor(CharacterData character)
+        {
+            foreach (TestBoardCellUI cell in cells)
+            {
+                if (cell != null)
+                {
+                    cell.RemoveCandidateMark(character);
                 }
             }
         }
@@ -234,6 +251,11 @@ namespace Murdoku.Characters
         private void HandleCellClicked(ICharacterPlacementCell cell)
         {
             CellClicked?.Invoke(cell);
+        }
+
+        private void HandleCellLongPressed(ICharacterPlacementCell cell)
+        {
+            CellLongPressed?.Invoke(cell);
         }
 
         private void HandleCharacterDropped(CharacterData character, ICharacterPlacementCell cell)

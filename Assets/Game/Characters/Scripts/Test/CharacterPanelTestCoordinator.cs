@@ -62,6 +62,17 @@ namespace Murdoku.Characters
         private static readonly string[] DifficultyNames = { "教程", "简单", "中等", "困难", "噩梦" };
         private List<PuzzlePlacementData> solutionPlacements;
 
+        private sealed class GameAction
+        {
+            public bool IsPlacement;
+            public TestBoardCellUI MarkCell;
+            public CharacterData MarkCharacter;
+            public bool MarkWasAdded;
+        }
+
+        private readonly List<GameAction> undoActions = new List<GameAction>();
+        private readonly List<GameAction> redoActions = new List<GameAction>();
+
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
         private static readonly Color SuccessColor = new Color(0.45f, 0.80f, 0.50f, 1f);
 
@@ -70,6 +81,7 @@ namespace Murdoku.Characters
             if (testBoard != null)
             {
                 testBoard.CellClicked += HandleCellClicked;
+                testBoard.CellLongPressed += HandleCellLongPressed;
                 testBoard.CharacterDropped += HandleCharacterDropped;
             }
         }
@@ -93,6 +105,7 @@ namespace Murdoku.Characters
             if (testBoard != null)
             {
                 testBoard.CellClicked -= HandleCellClicked;
+                testBoard.CellLongPressed -= HandleCellLongPressed;
                 testBoard.CharacterDropped -= HandleCharacterDropped;
             }
         }
@@ -150,6 +163,41 @@ namespace Murdoku.Characters
                 return;
             }
 
+            // 游玩模式：默认点击 = 标记候选人物（长按或拖拽才是放置）。
+            if (playMode)
+            {
+                if (placementController == null)
+                {
+                    SetStatus("人物放置控制器未配置。");
+                    return;
+                }
+
+                CharacterData markedCharacter = placementController.SelectedCharacter;
+                if (markedCharacter == null)
+                {
+                    SetStatus("请先选择一名人物，再点击格子标记候选（长按才是放置）。");
+                    return;
+                }
+
+                if (cell is TestBoardCellUI markCell)
+                {
+                    bool added = markCell.ToggleCandidateMark(markedCharacter);
+                    PushMarkAction(markCell, markedCharacter, added);
+                    Vector2Int pos = cell.GridPosition;
+                    if (added)
+                    {
+                        SetStatus("已标记 " + markedCharacter.DisplayName + " 为 (" + pos.x + "," + pos.y + ") 的候选，长按才是放置。");
+                    }
+                    else
+                    {
+                        SetStatus("已取消 " + markedCharacter.DisplayName + " 在 (" + pos.x + "," + pos.y + ") 的候选标记。");
+                    }
+                }
+
+                RefreshHighlights();
+                return;
+            }
+
             if (placementController == null)
             {
                 SetStatus("人物放置控制器未配置。");
@@ -159,6 +207,60 @@ namespace Murdoku.Characters
             CharacterData selected = placementController.SelectedCharacter;
             CharacterPlacementResult result = placementController.HandleCellClicked(cell);
             ShowPlacementResult(selected, cell, result);
+            if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
+            {
+                PushPlacementAction();
+            }
+
+            RefreshHighlights();
+        }
+
+        private void HandleCellLongPressed(ICharacterPlacementCell cell)
+        {
+            CharacterPanelUI characterPanel = placementController == null ? null : placementController.SelectionSource;
+            bool blackX = characterPanel != null && characterPanel.BlackXActive;
+
+            // 黑叉模式下长按等同点击（打叉/取消）。
+            if (blackX)
+            {
+                if (cell is TestBoardCellUI cellUI)
+                {
+                    if (playMode)
+                    {
+                        cellUI.TogglePlayerMark();
+                    }
+                    else
+                    {
+                        cellUI.SetEditorForbidden(!cellUI.EditorForbidden, true);
+                    }
+                }
+
+                return;
+            }
+
+            // 创建模式：长按与点击一致（放置/涂色/道具）。
+            if (!playMode)
+            {
+                HandleCellClicked(cell);
+                return;
+            }
+
+            // 游玩模式：长按 = 放置选中人物。
+            if (placementController == null)
+            {
+                SetStatus("人物放置控制器未配置。");
+                return;
+            }
+
+            CharacterData selected = placementController.SelectedCharacter;
+            CharacterPlacementResult result = placementController.HandleCellClicked(cell);
+            ShowPlacementResult(selected, cell, result);
+            if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
+            {
+                testBoard?.ClearCandidateMarksFor(selected);
+                PushPlacementAction();
+            }
+
             RefreshHighlights();
         }
 
@@ -172,6 +274,12 @@ namespace Murdoku.Characters
 
             CharacterPlacementResult result = placementController.HandleCharacterDropped(character, cell);
             ShowPlacementResult(character, cell, result);
+            if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
+            {
+                testBoard?.ClearCandidateMarksFor(character);
+                PushPlacementAction();
+            }
+
             RefreshHighlights();
         }
 
@@ -427,8 +535,11 @@ namespace Murdoku.Characters
                 placementController.ClearUndoHistory();
             }
 
+            undoActions.Clear();
+            redoActions.Clear();
+
             RefreshHighlights();
-            SetStatus("已载入关卡：" + data.name + "，请根据线索放置人物后提交。");
+            SetStatus("已载入关卡：" + data.name + "，点击格子标记候选，长按或拖拽人物卡放置，摆完提交。");
         }
 
         /// <summary>
@@ -1540,23 +1651,59 @@ namespace Murdoku.Characters
         /// <summary>
         /// 游玩模式撤销：回退最近一步人物放置/移动操作（多步可连续撤销）。
         /// </summary>
+        private void PushPlacementAction()
+        {
+            undoActions.Add(new GameAction { IsPlacement = true });
+            redoActions.Clear();
+        }
+
+        private void PushMarkAction(TestBoardCellUI cell, CharacterData character, bool wasAdded)
+        {
+            undoActions.Add(new GameAction
+            {
+                IsPlacement = false,
+                MarkCell = cell,
+                MarkCharacter = character,
+                MarkWasAdded = wasAdded
+            });
+            redoActions.Clear();
+        }
+
         private void HandleUndoClicked()
         {
-            if (placementController == null)
+            if (undoActions.Count == 0)
             {
-                SetStatus("放置控制器不可用。", true);
+                SetStatus("没有可撤销的操作。");
                 return;
             }
 
-            if (placementController.UndoLastPlacement())
+            GameAction action = undoActions[undoActions.Count - 1];
+            undoActions.RemoveAt(undoActions.Count - 1);
+
+            if (action.IsPlacement)
             {
-                RefreshHighlights();
-                SetStatus("已撤销上一步操作。");
+                if (placementController == null)
+                {
+                    undoActions.Add(action);
+                    SetStatus("放置控制器不可用。", true);
+                    return;
+                }
+
+                if (!placementController.UndoLastPlacement())
+                {
+                    undoActions.Add(action);
+                    SetStatus("没有可撤销的操作。");
+                    return;
+                }
             }
-            else
+            else if (action.MarkCell != null && action.MarkCharacter != null)
             {
-                SetStatus("没有可撤销的操作。");
+                action.MarkCell.ToggleCandidateMark(action.MarkCharacter);
             }
+
+            redoActions.Add(action);
+            RefreshHighlights();
+            SetStatus("已撤销上一步操作。");
         }
 
         /// <summary>
@@ -1564,21 +1711,39 @@ namespace Murdoku.Characters
         /// </summary>
         private void HandleRedoClicked()
         {
-            if (placementController == null)
+            if (redoActions.Count == 0)
             {
-                SetStatus("放置控制器不可用。", true);
+                SetStatus("没有可恢复的操作。");
                 return;
             }
 
-            if (placementController.RedoLastPlacement())
+            GameAction action = redoActions[redoActions.Count - 1];
+            redoActions.RemoveAt(redoActions.Count - 1);
+
+            if (action.IsPlacement)
             {
-                RefreshHighlights();
-                SetStatus("已恢复上一步操作。");
+                if (placementController == null)
+                {
+                    redoActions.Add(action);
+                    SetStatus("放置控制器不可用。", true);
+                    return;
+                }
+
+                if (!placementController.RedoLastPlacement())
+                {
+                    redoActions.Add(action);
+                    SetStatus("没有可恢复的操作。");
+                    return;
+                }
             }
-            else
+            else if (action.MarkCell != null && action.MarkCharacter != null)
             {
-                SetStatus("没有可恢复的操作。");
+                action.MarkCell.ToggleCandidateMark(action.MarkCharacter);
             }
+
+            undoActions.Add(action);
+            RefreshHighlights();
+            SetStatus("已恢复上一步操作。");
         }
 
         private void SubmitPuzzle()
