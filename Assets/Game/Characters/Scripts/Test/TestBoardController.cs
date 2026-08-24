@@ -44,26 +44,71 @@ namespace Murdoku.Characters
         public RectTransform GridRoot => gridRoot;
 
         /// <summary>
-        /// 根据当前放置结果刷新整张棋盘的行/列占用高亮。
+        /// 行列高亮已取消（放置人物后改用黑叉禁用标记，湖泊等蓝色格子上更醒目），
+        /// 此方法现在只负责清除所有行列高亮。
         /// </summary>
         public void RefreshRowColumnHighlights()
         {
-            HashSet<int> occupiedRows = new HashSet<int>();
-            HashSet<int> occupiedColumns = new HashSet<int>();
-
             foreach (TestBoardCellUI cell in cells)
             {
-                // 只有真正放置的人物才计入行列占用；
-                // 候选标记是推理笔记，不打出行列高亮遮罩。
-                if (cell == null || !cell.IsOccupied)
+                if (cell != null)
+                {
+                    cell.SetRowColumnHighlight(false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 放置人物后：给该人物所在行/列的空格打上玩家禁用标记（黑叉，推理辅助）。
+        /// 返回被打标记的格子列表（撤销时清除）。
+        /// </summary>
+        public List<TestBoardCellUI> DisableRowColumnCells(CharacterData placed, ICharacterPlacementCell atCell)
+        {
+            List<TestBoardCellUI> disabled = new List<TestBoardCellUI>();
+            if (placed == null || atCell == null)
+            {
+                return disabled;
+            }
+
+            int row = atCell.GridPosition.y;
+            int column = atCell.GridPosition.x;
+            foreach (TestBoardCellUI cell in cells)
+            {
+                if (cell == null || cell.IsOccupied)
                 {
                     continue;
                 }
 
-                occupiedRows.Add(cell.GridPosition.y);
-                occupiedColumns.Add(cell.GridPosition.x);
+                Vector2Int pos = cell.GridPosition;
+                if (pos.y == row || pos.x == column)
+                {
+                    if (!cell.IsForbidden)
+                    {
+                        cell.SetPlayerMark(true);
+                        disabled.Add(cell);
+                    }
+                }
             }
 
+            return disabled;
+        }
+
+        /// <summary>
+        /// 放置人物后：清除该人物所在行/列上其他角色的候选标记（该行列已被占用）。
+        /// 返回被清除的 (格子, 角色) 记录列表（撤销时恢复）。
+        /// </summary>
+        public List<(TestBoardCellUI, CharacterData)> ClearOtherMarksInRowColumn(
+            CharacterData placed,
+            ICharacterPlacementCell atCell)
+        {
+            List<(TestBoardCellUI, CharacterData)> cleared = new List<(TestBoardCellUI, CharacterData)>();
+            if (placed == null || atCell == null)
+            {
+                return cleared;
+            }
+
+            int row = atCell.GridPosition.y;
+            int column = atCell.GridPosition.x;
             foreach (TestBoardCellUI cell in cells)
             {
                 if (cell == null)
@@ -71,10 +116,23 @@ namespace Murdoku.Characters
                     continue;
                 }
 
-                bool highlighted = occupiedRows.Contains(cell.GridPosition.y) ||
-                                   occupiedColumns.Contains(cell.GridPosition.x);
-                cell.SetRowColumnHighlight(highlighted);
+                Vector2Int pos = cell.GridPosition;
+                if (pos.y != row && pos.x != column)
+                {
+                    continue;
+                }
+
+                List<CharacterData> removed = cell.RemoveCandidateMarksExcept(placed);
+                foreach (CharacterData character in removed)
+                {
+                    if (character != null)
+                    {
+                        cleared.Add((cell, character));
+                    }
+                }
             }
+
+            return cleared;
         }
 
         /// <summary>

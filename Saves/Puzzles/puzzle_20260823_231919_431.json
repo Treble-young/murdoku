@@ -151,33 +151,33 @@
         6,
         6,
         6,
-        4,
-        4,
+        3,
+        3,
         4,
         4,
         17,
         4,
         4,
         4,
+        3,
+        3,
         4,
         4,
         4,
         4,
         4,
         4,
+        3,
+        3,
         4,
         4,
         4,
         4,
         4,
         4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
+        3,
+        3,
+        3,
         4,
         4,
         4,
@@ -324,16 +324,16 @@
     ],
     "regionNameOffsets": [
         {
-            "x": 10.0,
-            "y": 10.0
-        },
-        {
-            "x": 10.0,
+            "x": 0.0,
             "y": 100.0
         },
         {
-            "x": -10.0,
-            "y": -10.0
+            "x": -30.0,
+            "y": -200.0
+        },
+        {
+            "x": -30.0,
+            "y": 30.0
         },
         {
             "x": 0.0,
@@ -342,32 +342,32 @@
     ],
     "placements": [
         {
-            "characterId": "A",
-            "cellIndex": 35
-        },
-        {
-            "characterId": "B",
-            "cellIndex": 28
-        },
-        {
-            "characterId": "C",
-            "cellIndex": 18
-        },
-        {
-            "characterId": "D",
-            "cellIndex": 15
+            "characterId": "G",
+            "cellIndex": 56
         },
         {
             "characterId": "E",
             "cellIndex": 41
         },
         {
+            "characterId": "C",
+            "cellIndex": 18
+        },
+        {
+            "characterId": "B",
+            "cellIndex": 28
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 15
+        },
+        {
             "characterId": "F",
             "cellIndex": 6
         },
         {
-            "characterId": "G",
-            "cellIndex": 56
+            "characterId": "A",
+            "cellIndex": 35
         },
         {
             "characterId": "V",
@@ -383,19 +383,19 @@
         },
         {
             "characterId": "B",
-            "clue": "她没有坐在椅子上。",
+            "clue": "她没有坐在椅子三。",
             "name": "Brian",
             "gender": 2
         },
         {
             "characterId": "C",
-            "clue": "他在地毯上。",
+            "clue": "他在地毯三。",
             "name": "Chris",
             "gender": 1
         },
         {
             "characterId": "D",
-            "clue": "他没有坐在椅子上。",
+            "clue": "他没有坐在椅子三。",
             "name": "Dave",
             "gender": 1
         },

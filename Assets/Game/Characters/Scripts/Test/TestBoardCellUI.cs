@@ -11,7 +11,8 @@ namespace Murdoku.Characters
         IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler,
         IPointerDownHandler, IPointerUpHandler
     {
-        private const float LongPressSeconds = 0.45f;
+        private const float LongPressSeconds = 0.6f;
+        private const float RingShowDelay = 0.15f;
 
         [Header("Cell")]
         [SerializeField] private Button button;
@@ -57,6 +58,8 @@ namespace Murdoku.Characters
         private bool suppressClick;
         private bool isPressed;
         private bool longPressTriggered;
+        private Image longPressRing;
+        private static Sprite longPressRingSprite;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<ICharacterPlacementCell> LongPressed;
@@ -272,6 +275,7 @@ namespace Murdoku.Characters
         public void OnPointerUp(PointerEventData eventData)
         {
             isPressed = false;
+            HideLongPressRing();
             if (!longPressTriggered &&
                 Time.unscaledTime - pressStartTime >= LongPressSeconds &&
                 RectTransformUtility.RectangleContainsScreenPoint(
@@ -289,7 +293,8 @@ namespace Murdoku.Characters
         {
             // 长按检测：直接用 Input 系统（不依赖 EventSystem 的 pointer 事件链路，
             // 避免 press/click 事件被其他层拦截导致长按失效）。
-            // 鼠标按下且落在本格内时启动计时；按住持续达到长按时长立即触发。
+            // 鼠标按下且落在本格内时启动计时；按住前 RingShowDelay 秒不显示读条，
+            // 之后读条从 0 开始填充，转满 LongPressSeconds 即触发长按放置。
             if (Input.GetMouseButtonDown(0) &&
                 RectTransformUtility.RectangleContainsScreenPoint(
                     (RectTransform)transform,
@@ -300,22 +305,141 @@ namespace Murdoku.Characters
                 isPressed = true;
                 longPressTriggered = false;
                 suppressClick = false;
+                HideLongPressRing();
             }
-            else if (Input.GetMouseButton(0) && isPressed && !longPressTriggered &&
-                Time.unscaledTime - pressStartTime >= LongPressSeconds &&
-                RectTransformUtility.RectangleContainsScreenPoint(
-                    (RectTransform)transform,
-                    Input.mousePosition,
-                    null))
+            else if (Input.GetMouseButton(0) && isPressed && !longPressTriggered)
             {
-                longPressTriggered = true;
-                suppressClick = true;
-                LongPressed?.Invoke(this);
+                if (RectTransformUtility.RectangleContainsScreenPoint(
+                        (RectTransform)transform,
+                        Input.mousePosition,
+                        null))
+                {
+                    float held = Time.unscaledTime - pressStartTime;
+                    if (held >= LongPressSeconds)
+                    {
+                        longPressTriggered = true;
+                        suppressClick = true;
+                        HideLongPressRing();
+                        LongPressed?.Invoke(this);
+                    }
+                    else if (held >= RingShowDelay)
+                    {
+                        // 过了延迟才开始显示读条，进度从 0 填充到 1。
+                        ShowLongPressRing((held - RingShowDelay) / (LongPressSeconds - RingShowDelay));
+                    }
+                    else
+                    {
+                        HideLongPressRing();
+                    }
+                }
+                else
+                {
+                    // 长按过程中鼠标移出格子：放弃并隐藏读条。
+                    isPressed = false;
+                    HideLongPressRing();
+                }
             }
             else if (!Input.GetMouseButton(0))
             {
                 isPressed = false;
+                HideLongPressRing();
             }
+        }
+
+        /// <summary>
+        /// 长按读条：格子中央的环形进度（Image Filled Radial360 + 圆环纹理）。
+        /// </summary>
+        private void ShowLongPressRing(float fillAmount)
+        {
+            if (!interactionEnabled)
+            {
+                return;
+            }
+
+            Image ring = EnsureLongPressRing();
+            if (ring != null)
+            {
+                ring.fillAmount = Mathf.Clamp01(fillAmount);
+                ring.gameObject.SetActive(true);
+            }
+        }
+
+        private void HideLongPressRing()
+        {
+            if (longPressRing != null)
+            {
+                longPressRing.gameObject.SetActive(false);
+            }
+        }
+
+        private Image EnsureLongPressRing()
+        {
+            if (longPressRing != null)
+            {
+                return longPressRing;
+            }
+
+            RectTransform cellRect = (RectTransform)transform;
+            float cellSize = Mathf.Min(cellRect.rect.width, cellRect.rect.height);
+
+            GameObject ringObject = new GameObject(
+                "LongPressRing",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            ringObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform ringRect = (RectTransform)ringObject.transform;
+            ringRect.SetParent(transform, false);
+            ringRect.anchorMin = new Vector2(0.5f, 0.5f);
+            ringRect.anchorMax = new Vector2(0.5f, 0.5f);
+            ringRect.pivot = new Vector2(0.5f, 0.5f);
+            ringRect.sizeDelta = new Vector2(cellSize * 0.72f, cellSize * 0.72f);
+            ringRect.SetAsLastSibling();
+
+            Image ring = ringObject.GetComponent<Image>();
+            ring.sprite = GetLongPressRingSprite();
+            ring.type = Image.Type.Filled;
+            ring.fillMethod = Image.FillMethod.Radial360;
+            ring.fillOrigin = (int)Image.Origin360.Top;
+            ring.fillClockwise = true;
+            ring.color = new Color(0.22f, 0.48f, 0.86f, 0.95f);
+            ring.raycastTarget = false;
+            ring.gameObject.SetActive(false);
+            longPressRing = ring;
+            return ring;
+        }
+
+        private static Sprite GetLongPressRingSprite()
+        {
+            if (longPressRingSprite != null)
+            {
+                return longPressRingSprite;
+            }
+
+            const int size = 256;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float center = size / 2f - 0.5f;
+            float outer = size / 2f - 2f;
+            float inner = outer * 0.72f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float dy = y - center;
+                    float distanceSq = dx * dx + dy * dy;
+                    bool inRing = distanceSq <= outer * outer && distanceSq >= inner * inner;
+                    texture.SetPixel(x, y, inRing ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            longPressRingSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            return longPressRingSprite;
         }
 
         /// <summary>
@@ -428,6 +552,47 @@ namespace Murdoku.Characters
         {
             playerMarked = !playerMarked;
             RefreshForbiddenMark();
+        }
+
+        /// <summary>显式设置玩家禁用标记（放置人物后给行列空格打黑叉用）。</summary>
+        public void SetPlayerMark(bool marked)
+        {
+            if (playerMarked == marked)
+            {
+                return;
+            }
+
+            playerMarked = marked;
+            RefreshForbiddenMark();
+        }
+
+        /// <summary>
+        /// 移除该格上除 keep 外的所有候选标记，返回被移除的角色列表（供撤销时恢复）。
+        /// </summary>
+        public List<CharacterData> RemoveCandidateMarksExcept(CharacterData keep)
+        {
+            List<CharacterData> removed = new List<CharacterData>();
+            if (candidateMarks.Count == 0)
+            {
+                return removed;
+            }
+
+            for (int index = candidateMarks.Count - 1; index >= 0; index--)
+            {
+                CharacterData mark = candidateMarks[index];
+                if (mark != null && !ReferenceEquals(mark, keep))
+                {
+                    candidateMarks.RemoveAt(index);
+                    removed.Add(mark);
+                }
+            }
+
+            if (removed.Count > 0)
+            {
+                RebuildCandidateMarkVisual();
+            }
+
+            return removed;
         }
 
         private bool editorMarkVisible;

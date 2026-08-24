@@ -71,6 +71,12 @@ namespace Murdoku.Characters
 
             /// <summary>放置时被清除候选标记的格子（撤销放置时恢复这些标记）。</summary>
             public List<TestBoardCellUI> RestoreMarkCells;
+
+            /// <summary>放置后被打上禁用标记（黑叉）的行列空格（撤销时清除）。</summary>
+            public List<TestBoardCellUI> DisabledCells;
+
+            /// <summary>放置后从行列上清除的其他角色候选标记（撤销时恢复）。</summary>
+            public List<(TestBoardCellUI, CharacterData)> ClearedOtherMarks;
         }
 
         private readonly List<GameAction> undoActions = new List<GameAction>();
@@ -193,6 +199,14 @@ namespace Murdoku.Characters
                         return;
                     }
 
+                    // 人物已放置在棋盘上：位置已定，不能再打他的候选标记。
+                    if (placementController.TryGetPlacement(markedCharacter, out _))
+                    {
+                        SetStatus(markedCharacter.DisplayName + " 已经放置在棋盘上了，不能标记候选。");
+                        RefreshHighlights();
+                        return;
+                    }
+
                     bool added = markCell.ToggleCandidateMark(markedCharacter);
                     PushMarkAction(markCell, markedCharacter, added);
                     Vector2Int pos = cell.GridPosition;
@@ -221,7 +235,7 @@ namespace Murdoku.Characters
             ShowPlacementResult(selected, cell, result);
             if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
             {
-                PushPlacementAction(selected, null);
+                PushPlacementAction(selected);
             }
 
             RefreshHighlights();
@@ -269,8 +283,8 @@ namespace Murdoku.Characters
             ShowPlacementResult(selected, cell, result);
             if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
             {
-                List<TestBoardCellUI> cleared = testBoard == null ? null : testBoard.ClearCandidateMarksFor(selected);
-                PushPlacementAction(selected, cleared);
+                // 清除该人物全棋盘候选标记，并给所在行列空格打禁用标记、清除行列其他候选。
+                PushPlacementAction(selected);
             }
 
             RefreshHighlights();
@@ -288,8 +302,7 @@ namespace Murdoku.Characters
             ShowPlacementResult(character, cell, result);
             if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
             {
-                List<TestBoardCellUI> cleared = testBoard == null ? null : testBoard.ClearCandidateMarksFor(character);
-                PushPlacementAction(character, cleared);
+                PushPlacementAction(character);
             }
 
             RefreshHighlights();
@@ -624,7 +637,8 @@ namespace Murdoku.Characters
             {
                 if (data.forbiddenCells[index])
                 {
-                    testBoard.Cells[index].SetEditorForbidden(true, false);
+                    // 编辑模式载入显示黑叉（可继续编辑）；游玩模式隐形生效（避免剧透）。
+                    testBoard.Cells[index].SetEditorForbidden(true, !playMode);
                 }
             }
         }
@@ -1668,14 +1682,31 @@ namespace Murdoku.Characters
         /// <summary>
         /// 游玩模式撤销：回退最近一步人物放置/移动操作（多步可连续撤销）。
         /// </summary>
-        private void PushPlacementAction(CharacterData placedCharacter, List<TestBoardCellUI> restoreMarkCells)
+        /// <summary>
+        /// 放置/移动成功后入栈：清除该人物全棋盘候选标记，
+        /// 给其所在行列空格打禁用标记（黑叉）、清除行列其他候选标记，
+        /// 并记录快照供撤销时还原。
+        /// </summary>
+        private void PushPlacementAction(CharacterData placedCharacter)
         {
-            undoActions.Add(new GameAction
+            GameAction action = new GameAction
             {
                 IsPlacement = true,
-                MarkCharacter = placedCharacter,
-                RestoreMarkCells = restoreMarkCells
-            });
+                MarkCharacter = placedCharacter
+            };
+
+            if (playMode && placedCharacter != null && testBoard != null)
+            {
+                action.RestoreMarkCells = testBoard.ClearCandidateMarksFor(placedCharacter);
+                if (placementController != null &&
+                    placementController.TryGetPlacement(placedCharacter, out ICharacterPlacementCell atCell))
+                {
+                    action.DisabledCells = testBoard.DisableRowColumnCells(placedCharacter, atCell);
+                    action.ClearedOtherMarks = testBoard.ClearOtherMarksInRowColumn(placedCharacter, atCell);
+                }
+            }
+
+            undoActions.Add(action);
             redoActions.Clear();
         }
 
@@ -1729,6 +1760,30 @@ namespace Murdoku.Characters
                         }
                     }
                 }
+
+                // 清除放置时打上的行列禁用标记（黑叉）。
+                if (action.DisabledCells != null)
+                {
+                    foreach (TestBoardCellUI disabledCell in action.DisabledCells)
+                    {
+                        if (disabledCell != null)
+                        {
+                            disabledCell.SetPlayerMark(false);
+                        }
+                    }
+                }
+
+                // 恢复放置时从行列上清除的其他角色候选标记。
+                if (action.ClearedOtherMarks != null)
+                {
+                    foreach ((TestBoardCellUI otherCell, CharacterData otherCharacter) in action.ClearedOtherMarks)
+                    {
+                        if (otherCell != null && otherCharacter != null)
+                        {
+                            otherCell.ToggleCandidateMark(otherCharacter);
+                        }
+                    }
+                }
             }
             else if (action.MarkCell != null && action.MarkCharacter != null)
             {
@@ -1768,6 +1823,14 @@ namespace Murdoku.Characters
                     redoActions.Add(action);
                     SetStatus("没有可恢复的操作。");
                     return;
+                }
+
+                // 重做放置后重新打行列禁用标记、清除行列其他候选，并刷新快照（供再次撤销还原）。
+                if (action.MarkCharacter != null && testBoard != null &&
+                    placementController.TryGetPlacement(action.MarkCharacter, out ICharacterPlacementCell atCell))
+                {
+                    action.DisabledCells = testBoard.DisableRowColumnCells(action.MarkCharacter, atCell);
+                    action.ClearedOtherMarks = testBoard.ClearOtherMarksInRowColumn(action.MarkCharacter, atCell);
                 }
             }
             else if (action.MarkCell != null && action.MarkCharacter != null)
