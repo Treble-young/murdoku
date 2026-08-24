@@ -55,6 +55,8 @@ namespace Murdoku.Characters
         private readonly List<GameObject> candidateMarkChips = new List<GameObject>();
         private float pressStartTime;
         private bool suppressClick;
+        private bool isPressed;
+        private bool longPressTriggered;
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<ICharacterPlacementCell> LongPressed;
@@ -117,7 +119,7 @@ namespace Murdoku.Characters
         /// </summary>
         public bool ToggleCandidateMark(CharacterData character)
         {
-            if (character == null)
+            if (character == null || IsForbidden)
             {
                 return false;
             }
@@ -138,17 +140,21 @@ namespace Murdoku.Characters
             return added;
         }
 
-        public void RemoveCandidateMark(CharacterData character)
+        /// <summary>移除该格上某角色的候选标记；返回是否确实移除了标记（用于撤销恢复快照）。</summary>
+        public bool RemoveCandidateMark(CharacterData character)
         {
             if (character == null)
             {
-                return;
+                return false;
             }
 
             if (candidateMarks.Remove(character))
             {
                 RebuildCandidateMarkVisual();
+                return true;
             }
+
+            return false;
         }
 
         public void ClearCandidateMarks()
@@ -258,19 +264,57 @@ namespace Murdoku.Characters
         public void OnPointerDown(PointerEventData eventData)
         {
             pressStartTime = Time.unscaledTime;
+            isPressed = true;
+            longPressTriggered = false;
             suppressClick = false;
         }
 
         public void OnPointerUp(PointerEventData eventData)
         {
-            if (Time.unscaledTime - pressStartTime >= LongPressSeconds &&
+            isPressed = false;
+            if (!longPressTriggered &&
+                Time.unscaledTime - pressStartTime >= LongPressSeconds &&
                 RectTransformUtility.RectangleContainsScreenPoint(
                     (RectTransform)transform,
                     eventData.position,
                     eventData.pressEventCamera))
             {
+                longPressTriggered = true;
                 suppressClick = true;
                 LongPressed?.Invoke(this);
+            }
+        }
+
+        private void Update()
+        {
+            // 长按检测：直接用 Input 系统（不依赖 EventSystem 的 pointer 事件链路，
+            // 避免 press/click 事件被其他层拦截导致长按失效）。
+            // 鼠标按下且落在本格内时启动计时；按住持续达到长按时长立即触发。
+            if (Input.GetMouseButtonDown(0) &&
+                RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)transform,
+                    Input.mousePosition,
+                    null))
+            {
+                pressStartTime = Time.unscaledTime;
+                isPressed = true;
+                longPressTriggered = false;
+                suppressClick = false;
+            }
+            else if (Input.GetMouseButton(0) && isPressed && !longPressTriggered &&
+                Time.unscaledTime - pressStartTime >= LongPressSeconds &&
+                RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)transform,
+                    Input.mousePosition,
+                    null))
+            {
+                longPressTriggered = true;
+                suppressClick = true;
+                LongPressed?.Invoke(this);
+            }
+            else if (!Input.GetMouseButton(0))
+            {
+                isPressed = false;
             }
         }
 

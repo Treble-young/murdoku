@@ -53,7 +53,9 @@ namespace Murdoku.Characters
 
             foreach (TestBoardCellUI cell in cells)
             {
-                if (cell == null || (!cell.IsOccupied && !cell.HasAnyCandidateMark))
+                // 只有真正放置的人物才计入行列占用；
+                // 候选标记是推理笔记，不打出行列高亮遮罩。
+                if (cell == null || !cell.IsOccupied)
                 {
                     continue;
                 }
@@ -236,16 +238,20 @@ namespace Murdoku.Characters
 
         /// <summary>
         /// 人物放置后清空该人物在整张棋盘上的候选标记，避免残留干扰推理。
+        /// 返回实际清除了标记的格子列表（供撤销放置时恢复标记）。
         /// </summary>
-        public void ClearCandidateMarksFor(CharacterData character)
+        public List<TestBoardCellUI> ClearCandidateMarksFor(CharacterData character)
         {
+            List<TestBoardCellUI> cleared = new List<TestBoardCellUI>();
             foreach (TestBoardCellUI cell in cells)
             {
-                if (cell != null)
+                if (cell != null && cell.RemoveCandidateMark(character))
                 {
-                    cell.RemoveCandidateMark(character);
+                    cleared.Add(cell);
                 }
             }
+
+            return cleared;
         }
 
         private void HandleCellClicked(ICharacterPlacementCell cell)
