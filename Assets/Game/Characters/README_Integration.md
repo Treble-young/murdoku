@@ -1,8 +1,8 @@
 # Character System Integration
 
-`CharacterPanelTest.unity` is an isolated development scene. Do not add it to the
-normal game flow and do not copy its camera, canvas, event system, or test board
-into a production level.
+`PuzzleScene.unity` is the production scene used by both puzzle creation and
+gameplay. It owns the camera, canvas, event system, puzzle board, character panel,
+and the scene-level coordinator.
 
 ## Production board contract
 
@@ -23,7 +23,7 @@ public interface ICharacterPlacementCell
 
 When a production cell is clicked, pass that cell to
 `CharacterPlacementController.HandleCellClicked`. The placement controller must
-not look up `Tile`, `GridManager`, or any test-board component.
+not look up a concrete board implementation.
 
 For drag-and-drop input, resolve the dragged `CharacterData` and pass it together
 with the target cell to
@@ -53,7 +53,7 @@ Clicking a selected character card again clears the selection and restores its
 `VisualRoot` to scale `1.0`. Beginning a drag selects the source card without
 toggling it off.
 
-The three data assets under `Data/` are placeholders for the test scene. Portraits,
+The three data assets under `Data/` provide starter character definitions. Portraits,
 names, gender, clue text, and placeholder colors can be replaced in the Inspector.
 
 ## Runtime portrait catalog
@@ -74,12 +74,9 @@ Use `Tools > Murdoku > Setup Character Portraits` after replacing files under
 the catalog, and keeps `CharacterSystem.prefab` connected to it without opening a
 gameplay scene.
 
-## Test-only assets
+## Production scene assets
 
-`TestBoardController`, `TestBoardCellUI`, `TestBoardCell.prefab`,
-`CharacterPanelTestCoordinator`, and `CharacterPanelTest.unity` are test-only.
-They demonstrate the placement interface but are not the production-board
-implementation.
-
-Do not add `CharacterPanelTest.unity` to Build Settings or load it from the main
-menu. Do not move its EventSystem, Main Camera, or Canvas into `Level01.unity`.
+`PuzzleBoardController`, `PuzzleBoardCellUI`, `PuzzleBoardCell.prefab`,
+`PuzzleSceneCoordinator`, and `PuzzleScene.unity` form the current production
+board and game flow. `PuzzleScene.unity` must remain enabled in Build Settings
+because the main menu and level-selection scene load it by name.

@@ -201,20 +201,20 @@
     ],
     "placements": [
         {
-            "characterId": "C",
-            "cellIndex": 10
-        },
-        {
-            "characterId": "D",
-            "cellIndex": 17
-        },
-        {
             "characterId": "A",
             "cellIndex": 32
         },
         {
+            "characterId": "C",
+            "cellIndex": 10
+        },
+        {
             "characterId": "B",
             "cellIndex": 19
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 17
         },
         {
             "characterId": "E",
@@ -258,7 +258,7 @@
         },
         {
             "characterId": "V",
-            "clue": "",
+            "clue": "受害者，  和凶手在同一个区域",
             "name": "Victim",
             "gender": 1
         }

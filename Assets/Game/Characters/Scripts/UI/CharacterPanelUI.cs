@@ -17,7 +17,7 @@ namespace Murdoku.Characters
         private readonly List<CharacterCardUI> cards = new List<CharacterCardUI>();
         private readonly HashSet<CharacterData> placedCharacters = new HashSet<CharacterData>();
         private CharacterCardUI selectedCard;
-        private TestBoardController board;
+        private PuzzleBoardController board;
         private GameObject blackXCard;
         private GameObject blackXBorder;
         private bool blackXActive;
@@ -114,7 +114,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            foreach (TestBoardCellUI cell in board.Cells)
+            foreach (PuzzleBoardCellUI cell in board.Cells)
             {
                 if (cell != null)
                 {
@@ -235,7 +235,7 @@ namespace Murdoku.Characters
 
         private void Start()
         {
-            board = UnityEngine.Object.FindFirstObjectByType<TestBoardController>();
+            board = UnityEngine.Object.FindFirstObjectByType<PuzzleBoardController>();
             if (board != null)
             {
                 board.GridGenerated += HandleGridGenerated;

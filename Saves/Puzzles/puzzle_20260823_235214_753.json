@@ -434,10 +434,6 @@
             "cellIndex": 72
         },
         {
-            "characterId": "E",
-            "cellIndex": 60
-        },
-        {
             "characterId": "V",
             "cellIndex": 52
         },
@@ -446,12 +442,8 @@
             "cellIndex": 71
         },
         {
-            "characterId": "F",
-            "cellIndex": 29
-        },
-        {
-            "characterId": "G",
-            "cellIndex": 19
+            "characterId": "E",
+            "cellIndex": 60
         },
         {
             "characterId": "C",
@@ -464,6 +456,14 @@
         {
             "characterId": "B",
             "cellIndex": 4
+        },
+        {
+            "characterId": "G",
+            "cellIndex": 19
+        },
+        {
+            "characterId": "F",
+            "cellIndex": 29
         }
     ],
     "clues": [
@@ -475,7 +475,7 @@
         },
         {
             "characterId": "B",
-            "clue": "她正好在哈珀的上一行。",
+            "clue": "她正好在Hugo的三一行。",
             "name": "Ben",
             "gender": 2
         },
@@ -487,19 +487,19 @@
         },
         {
             "characterId": "D",
-            "clue": "他在爱丽丝的南边，芬利的西边。",
+            "clue": "他在Alan的南边，Fred的西边。",
             "name": "Dave",
             "gender": 1
         },
         {
             "characterId": "E",
-            "clue": "她是唯一一个坐在椅子上的人。",
+            "clue": "她是唯一一个坐在椅子三的人。",
             "name": "Eric",
             "gender": 2
         },
         {
             "characterId": "F",
-            "clue": "树旁；他北边还有一人也在这棵树旁",
+            "clue": "在树旁；他北边还有一人也在这棵树旁",
             "name": "Fred",
             "gender": 1
         },
@@ -511,7 +511,7 @@
         },
         {
             "characterId": "H",
-            "clue": "东 / 西森林，不靠树",
+            "clue": "在东 / 西森林，不在树旁",
             "name": "Hugo",
             "gender": 1
         },

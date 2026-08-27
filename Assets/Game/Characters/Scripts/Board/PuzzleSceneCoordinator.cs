@@ -15,10 +15,10 @@ namespace Murdoku.Characters
     /// - 把当前出题保存为关卡存档
     /// - 从选关场景进入时读取存档并还原棋盘、墙体与角色
     /// </summary>
-    public sealed class CharacterPanelTestCoordinator : MonoBehaviour
+    public sealed class PuzzleSceneCoordinator : MonoBehaviour
     {
         [Header("组件引用")]
-        [SerializeField] private TestBoardController testBoard;
+        [SerializeField] private PuzzleBoardController puzzleBoard;
         [SerializeField] private CharacterPlacementController placementController;
         [SerializeField] private WallEditController wallEditController;
         [SerializeField] private TMP_Text placementStatusText;
@@ -65,18 +65,18 @@ namespace Murdoku.Characters
         private sealed class GameAction
         {
             public bool IsPlacement;
-            public TestBoardCellUI MarkCell;
+            public PuzzleBoardCellUI MarkCell;
             public CharacterData MarkCharacter;
             public bool MarkWasAdded;
 
             /// <summary>放置时被清除候选标记的格子（撤销放置时恢复这些标记）。</summary>
-            public List<TestBoardCellUI> RestoreMarkCells;
+            public List<PuzzleBoardCellUI> RestoreMarkCells;
 
             /// <summary>放置后被打上禁用标记（黑叉）的行列空格（撤销时清除）。</summary>
-            public List<TestBoardCellUI> DisabledCells;
+            public List<PuzzleBoardCellUI> DisabledCells;
 
             /// <summary>放置后从行列上清除的其他角色候选标记（撤销时恢复）。</summary>
-            public List<(TestBoardCellUI, CharacterData)> ClearedOtherMarks;
+            public List<(PuzzleBoardCellUI, CharacterData)> ClearedOtherMarks;
         }
 
         private readonly List<GameAction> undoActions = new List<GameAction>();
@@ -87,11 +87,11 @@ namespace Murdoku.Characters
 
         private void OnEnable()
         {
-            if (testBoard != null)
+            if (puzzleBoard != null)
             {
-                testBoard.CellClicked += HandleCellClicked;
-                testBoard.CellLongPressed += HandleCellLongPressed;
-                testBoard.CharacterDropped += HandleCharacterDropped;
+                puzzleBoard.CellClicked += HandleCellClicked;
+                puzzleBoard.CellLongPressed += HandleCellLongPressed;
+                puzzleBoard.CharacterDropped += HandleCharacterDropped;
             }
         }
 
@@ -106,16 +106,17 @@ namespace Murdoku.Characters
             EnsureRegionPanel();
             EnsurePropsPanel();
             ApplyModeVisibility();
+            ApplyScenePolish();
             StartCoroutine(LoadSelectedPuzzleRoutine());
         }
 
         private void OnDisable()
         {
-            if (testBoard != null)
+            if (puzzleBoard != null)
             {
-                testBoard.CellClicked -= HandleCellClicked;
-                testBoard.CellLongPressed -= HandleCellLongPressed;
-                testBoard.CharacterDropped -= HandleCharacterDropped;
+                puzzleBoard.CellClicked -= HandleCellClicked;
+                puzzleBoard.CellLongPressed -= HandleCellLongPressed;
+                puzzleBoard.CharacterDropped -= HandleCharacterDropped;
             }
         }
 
@@ -125,7 +126,7 @@ namespace Murdoku.Characters
             RegionDefinition selectedRegion = regionPanel == null ? null : regionPanel.SelectedRegion;
             if (selectedRegion != null)
             {
-                if (cell is TestBoardCellUI cellUI)
+                if (cell is PuzzleBoardCellUI cellUI)
                 {
                     cellUI.SetFloorTile(selectedRegion.Index, selectedRegion.Sprite);
                 }
@@ -137,7 +138,7 @@ namespace Murdoku.Characters
             PropDefinition selectedProp = propPanel == null ? null : propPanel.SelectedProp;
             if (selectedProp != null)
             {
-                if (cell is TestBoardCellUI cellUI)
+                if (cell is PuzzleBoardCellUI cellUI)
                 {
                     if (cellUI.PropIndex == selectedProp.Index)
                     {
@@ -157,7 +158,7 @@ namespace Murdoku.Characters
             CharacterPanelUI characterPanel = placementController == null ? null : placementController.SelectionSource;
             if (characterPanel != null && characterPanel.BlackXActive)
             {
-                if (cell is TestBoardCellUI cellUI)
+                if (cell is PuzzleBoardCellUI cellUI)
                 {
                     if (playMode)
                     {
@@ -188,7 +189,7 @@ namespace Murdoku.Characters
                     return;
                 }
 
-                if (cell is TestBoardCellUI markCell)
+                if (cell is PuzzleBoardCellUI markCell)
                 {
                     // 出题人设置的禁放格（黑叉）不能放置，也不允许打候选标记。
                     if (markCell.IsForbidden)
@@ -249,7 +250,7 @@ namespace Murdoku.Characters
             // 黑叉模式下长按等同点击（打叉/取消）。
             if (blackX)
             {
-                if (cell is TestBoardCellUI cellUI)
+                if (cell is PuzzleBoardCellUI cellUI)
                 {
                     if (playMode)
                     {
@@ -372,7 +373,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            if (testBoard == null || placementController == null || wallEditController == null)
+            if (puzzleBoard == null || placementController == null || wallEditController == null)
             {
                 SetSaveHint("编辑器组件未配置完整，无法保存。", true);
                 return;
@@ -395,7 +396,7 @@ namespace Murdoku.Characters
                 }
             }
 
-            int size = testBoard.Rows;
+            int size = puzzleBoard.Rows;
             PuzzleData data = new PuzzleData
             {
                 // 编辑模式复用原关卡 id（覆盖保存）；新建关卡才生成新 id。
@@ -406,7 +407,7 @@ namespace Murdoku.Characters
                 globalClue = selectedGlobalClue,
                 horizontalWalls = new bool[(size - 1) * size],
                 verticalWalls = new bool[size * (size - 1)],
-                placements = placementController.ExportPlacements(testBoard.Columns)
+                placements = placementController.ExportPlacements(puzzleBoard.Columns)
             };
 
             WallMap walls = wallEditController.Walls;
@@ -461,23 +462,23 @@ namespace Murdoku.Characters
 
             // 保存格子地块（-1 = 无地块，否则为地块样式索引）。
             data.floorTiles = new int[size * size];
-            for (int index = 0; index < testBoard.Cells.Count && index < data.floorTiles.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.floorTiles.Length; index++)
             {
-                data.floorTiles[index] = testBoard.Cells[index].FloorTileIndex;
+                data.floorTiles[index] = puzzleBoard.Cells[index].FloorTileIndex;
             }
 
             // 保存格子道具（-1 = 无道具，否则为道具索引）。
             data.props = new int[size * size];
-            for (int index = 0; index < testBoard.Cells.Count && index < data.props.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.props.Length; index++)
             {
-                data.props[index] = testBoard.Cells[index].PropIndex;
+                data.props[index] = puzzleBoard.Cells[index].PropIndex;
             }
 
             // 保存出题人禁放格（true = 禁止放置人物）。
             data.forbiddenCells = new bool[size * size];
-            for (int index = 0; index < testBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
             {
-                data.forbiddenCells[index] = testBoard.Cells[index].EditorForbidden;
+                data.forbiddenCells[index] = puzzleBoard.Cells[index].EditorForbidden;
             }
 
             PuzzleSaveManager.SavePuzzle(data);
@@ -497,7 +498,7 @@ namespace Murdoku.Characters
             }
 
             PuzzleData data = PuzzleSaveManager.LoadPuzzle(puzzleId);
-            if (data == null || data.size < TestBoardController.MinSize || data.size > TestBoardController.MaxSize)
+            if (data == null || data.size < PuzzleBoardController.MinSize || data.size > PuzzleBoardController.MaxSize)
             {
                 SetStatus("未找到关卡存档，已进入空白棋盘。");
                 yield break;
@@ -524,9 +525,9 @@ namespace Murdoku.Characters
             yield return null;
             yield return null;
 
-            if (testBoard != null)
+            if (puzzleBoard != null)
             {
-                testBoard.SetGridSize(data.size, data.size);
+                puzzleBoard.SetGridSize(data.size, data.size);
             }
 
             // 等待新尺寸的棋盘布局与墙体边框重建完成。
@@ -577,7 +578,7 @@ namespace Murdoku.Characters
         /// </summary>
         private void RestoreFloorTiles(PuzzleData data)
         {
-            if (testBoard == null || data.floorTiles == null || data.floorTiles.Length == 0)
+            if (puzzleBoard == null || data.floorTiles == null || data.floorTiles.Length == 0)
             {
                 return;
             }
@@ -585,7 +586,7 @@ namespace Murdoku.Characters
             RegionStyleFactory.EnsureSprites();
             RegionDefinition[] definitions = RegionStyleFactory.All;
 
-            for (int index = 0; index < testBoard.Cells.Count && index < data.floorTiles.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.floorTiles.Length; index++)
             {
                 int tileIndex = data.floorTiles[index];
                 if (tileIndex < 0 || tileIndex >= definitions.Length)
@@ -593,7 +594,7 @@ namespace Murdoku.Characters
                     continue;
                 }
 
-                testBoard.Cells[index].SetFloorTile(tileIndex, definitions[tileIndex].Sprite);
+                puzzleBoard.Cells[index].SetFloorTile(tileIndex, definitions[tileIndex].Sprite);
             }
         }
 
@@ -602,7 +603,7 @@ namespace Murdoku.Characters
         /// </summary>
         private void RestoreProps(PuzzleData data)
         {
-            if (testBoard == null || data.props == null || data.props.Length == 0)
+            if (puzzleBoard == null || data.props == null || data.props.Length == 0)
             {
                 return;
             }
@@ -610,7 +611,7 @@ namespace Murdoku.Characters
             PropStyleFactory.EnsureSprites();
             PropDefinition[] definitions = PropStyleFactory.All;
 
-            for (int index = 0; index < testBoard.Cells.Count && index < data.props.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.props.Length; index++)
             {
                 int propIndex = data.props[index];
                 if (propIndex < 0 || propIndex >= definitions.Length)
@@ -618,7 +619,7 @@ namespace Murdoku.Characters
                     continue;
                 }
 
-                testBoard.Cells[index].SetProp(propIndex, definitions[propIndex].Sprite);
+                puzzleBoard.Cells[index].SetProp(propIndex, definitions[propIndex].Sprite);
             }
         }
 
@@ -628,17 +629,17 @@ namespace Murdoku.Characters
         /// </summary>
         private void RestoreForbiddenCells(PuzzleData data)
         {
-            if (testBoard == null || data.forbiddenCells == null || data.forbiddenCells.Length == 0)
+            if (puzzleBoard == null || data.forbiddenCells == null || data.forbiddenCells.Length == 0)
             {
                 return;
             }
 
-            for (int index = 0; index < testBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
+            for (int index = 0; index < puzzleBoard.Cells.Count && index < data.forbiddenCells.Length; index++)
             {
                 if (data.forbiddenCells[index])
                 {
                     // 编辑模式载入显示黑叉（可继续编辑）；游玩模式隐形生效（避免剧透）。
-                    testBoard.Cells[index].SetEditorForbidden(true, !playMode);
+                    puzzleBoard.Cells[index].SetEditorForbidden(true, !playMode);
                 }
             }
         }
@@ -695,6 +696,7 @@ namespace Murdoku.Characters
 
             RectTransform panel = CreateUiObject("Panel", root).GetComponent<RectTransform>();
             Image panelImage = panel.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(panelImage, 16);
             panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.98f);
             panel.anchorMin = new Vector2(0.5f, 0.5f);
             panel.anchorMax = new Vector2(0.5f, 0.5f);
@@ -773,9 +775,9 @@ namespace Murdoku.Characters
 
         private void RefreshHighlights()
         {
-            if (testBoard != null)
+            if (puzzleBoard != null)
             {
-                testBoard.RefreshRowColumnHighlights();
+                puzzleBoard.RefreshRowColumnHighlights();
             }
         }
 
@@ -1233,6 +1235,7 @@ namespace Murdoku.Characters
             panel.sizeDelta = new Vector2(760f, 900f);
             panel.anchoredPosition = Vector2.zero;
             Image panelImage = panel.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(panelImage, 16);
             panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.99f);
 
             TMP_Text title = CreateText("TitleText", panel, font, 28f, FontStyles.Bold);
@@ -1391,6 +1394,7 @@ namespace Murdoku.Characters
         private Button MakeButton(RectTransform rect, string labelText, TMP_FontAsset font, UnityEngine.Events.UnityAction onClick)
         {
             Image image = rect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(image, 8);
             image.color = new Color(0.22f, 0.48f, 0.86f, 1f);
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
@@ -1489,6 +1493,7 @@ namespace Murdoku.Characters
             panel.sizeDelta = new Vector2(760f, 760f);
             panel.anchoredPosition = Vector2.zero;
             Image panelImage = panel.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(panelImage, 16);
             panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.99f);
 
             TMP_Text title = CreateText("TitleText", panel, font, 28f, FontStyles.Bold);
@@ -1695,14 +1700,14 @@ namespace Murdoku.Characters
                 MarkCharacter = placedCharacter
             };
 
-            if (playMode && placedCharacter != null && testBoard != null)
+            if (playMode && placedCharacter != null && puzzleBoard != null)
             {
-                action.RestoreMarkCells = testBoard.ClearCandidateMarksFor(placedCharacter);
+                action.RestoreMarkCells = puzzleBoard.ClearCandidateMarksFor(placedCharacter);
                 if (placementController != null &&
                     placementController.TryGetPlacement(placedCharacter, out ICharacterPlacementCell atCell))
                 {
-                    action.DisabledCells = testBoard.DisableRowColumnCells(placedCharacter, atCell);
-                    action.ClearedOtherMarks = testBoard.ClearOtherMarksInRowColumn(placedCharacter, atCell);
+                    action.DisabledCells = puzzleBoard.DisableRowColumnCells(placedCharacter, atCell);
+                    action.ClearedOtherMarks = puzzleBoard.ClearOtherMarksInRowColumn(placedCharacter, atCell);
                 }
             }
 
@@ -1710,7 +1715,7 @@ namespace Murdoku.Characters
             redoActions.Clear();
         }
 
-        private void PushMarkAction(TestBoardCellUI cell, CharacterData character, bool wasAdded)
+        private void PushMarkAction(PuzzleBoardCellUI cell, CharacterData character, bool wasAdded)
         {
             undoActions.Add(new GameAction
             {
@@ -1752,7 +1757,7 @@ namespace Murdoku.Characters
                 // 恢复该人物放置时被清除的候选标记（撤销放置后推理标记不丢失）。
                 if (action.RestoreMarkCells != null && action.MarkCharacter != null)
                 {
-                    foreach (TestBoardCellUI restoreCell in action.RestoreMarkCells)
+                    foreach (PuzzleBoardCellUI restoreCell in action.RestoreMarkCells)
                     {
                         if (restoreCell != null)
                         {
@@ -1764,7 +1769,7 @@ namespace Murdoku.Characters
                 // 清除放置时打上的行列禁用标记（黑叉）。
                 if (action.DisabledCells != null)
                 {
-                    foreach (TestBoardCellUI disabledCell in action.DisabledCells)
+                    foreach (PuzzleBoardCellUI disabledCell in action.DisabledCells)
                     {
                         if (disabledCell != null)
                         {
@@ -1776,7 +1781,7 @@ namespace Murdoku.Characters
                 // 恢复放置时从行列上清除的其他角色候选标记。
                 if (action.ClearedOtherMarks != null)
                 {
-                    foreach ((TestBoardCellUI otherCell, CharacterData otherCharacter) in action.ClearedOtherMarks)
+                    foreach ((PuzzleBoardCellUI otherCell, CharacterData otherCharacter) in action.ClearedOtherMarks)
                     {
                         if (otherCell != null && otherCharacter != null)
                         {
@@ -1826,11 +1831,11 @@ namespace Murdoku.Characters
                 }
 
                 // 重做放置后重新打行列禁用标记、清除行列其他候选，并刷新快照（供再次撤销还原）。
-                if (action.MarkCharacter != null && testBoard != null &&
+                if (action.MarkCharacter != null && puzzleBoard != null &&
                     placementController.TryGetPlacement(action.MarkCharacter, out ICharacterPlacementCell atCell))
                 {
-                    action.DisabledCells = testBoard.DisableRowColumnCells(action.MarkCharacter, atCell);
-                    action.ClearedOtherMarks = testBoard.ClearOtherMarksInRowColumn(action.MarkCharacter, atCell);
+                    action.DisabledCells = puzzleBoard.DisableRowColumnCells(action.MarkCharacter, atCell);
+                    action.ClearedOtherMarks = puzzleBoard.ClearOtherMarksInRowColumn(action.MarkCharacter, atCell);
                 }
             }
             else if (action.MarkCell != null && action.MarkCharacter != null)
@@ -1845,9 +1850,9 @@ namespace Murdoku.Characters
 
         private void SubmitPuzzle()
         {
-            if (testBoard != null)
+            if (puzzleBoard != null)
             {
-                testBoard.ClearErrorHighlights();
+                puzzleBoard.ClearErrorHighlights();
             }
 
             if (placementController == null)
@@ -1879,7 +1884,7 @@ namespace Murdoku.Characters
                 return;
             }
 
-            if (testBoard == null)
+            if (puzzleBoard == null)
             {
                 ShowErrorPopup("提交失败", "棋盘未配置，无法判定。");
                 return;
@@ -1914,7 +1919,7 @@ namespace Murdoku.Characters
                 }
 
                 int expectedIndex = solution.cellIndex;
-                int actualIndex = solutionCell.GridPosition.y * testBoard.Columns + solutionCell.GridPosition.x;
+                int actualIndex = solutionCell.GridPosition.y * puzzleBoard.Columns + solutionCell.GridPosition.x;
                 if (actualIndex != expectedIndex)
                 {
                     HighlightCells(new List<ICharacterPlacementCell> { solutionCell });
@@ -2014,17 +2019,41 @@ namespace Murdoku.Characters
 
         private void HighlightCells(IEnumerable<ICharacterPlacementCell> cells)
         {
-            if (testBoard == null)
+            if (puzzleBoard == null)
             {
                 return;
             }
 
             foreach (ICharacterPlacementCell cell in cells)
             {
-                if (cell is TestBoardCellUI cellUI)
+                if (cell is PuzzleBoardCellUI cellUI)
                 {
                     cellUI.SetErrorHighlight(true);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 场景 UI 圆角美化：棋盘面板（PuzzleBoardPanel）与现有所有按钮。
+        /// 动态创建的控件（编辑线索弹窗、难度按钮）在各自创建处圆角化。
+        /// </summary>
+        private void ApplyScenePolish()
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                return;
+            }
+
+            RectTransform boardPanel = FindChildByName<RectTransform>(canvas.transform, "PuzzleBoardPanel");
+            if (boardPanel != null)
+            {
+                UiRoundedSprite.Apply(boardPanel.GetComponent<Image>(), 16);
+            }
+
+            foreach (Button button in FindObjectsByType<Button>(FindObjectsSortMode.None))
+            {
+                UiRoundedSprite.Apply(button.GetComponent<Image>(), 8);
             }
         }
 
@@ -2188,6 +2217,7 @@ namespace Murdoku.Characters
                 rect.anchoredPosition = new Vector2(446f + index * 86f, 0f);
 
                 Image background = rect.gameObject.AddComponent<Image>();
+                UiRoundedSprite.Apply(background, 8);
                 Button button = rect.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
                 button.onClick.AddListener(() => HandleDifficultyClicked(captured));

@@ -44,7 +44,7 @@ namespace Murdoku.Audio
                 return;
             }
 
-            if (targetButton.GetComponentInParent<TestBoardCellUI>(true) != null)
+            if (targetButton.GetComponentInParent<PuzzleBoardCellUI>(true) != null)
             {
                 return;
             }

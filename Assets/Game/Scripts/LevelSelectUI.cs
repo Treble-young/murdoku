@@ -13,7 +13,7 @@ namespace Murdoku
     /// </summary>
     public sealed class LevelSelectUI : MonoBehaviour
     {
-        private const int PageSize = 6;
+        private const int PageSize = 12;
         private const int TabCount = 6;
         private static readonly string[] TabNames = { "全部", "教程", "简单", "中等", "困难", "噩梦" };
 
@@ -58,7 +58,261 @@ namespace Murdoku
             }
 
             EnsureDifficultyTabs();
+            ApplyScenePolish();
         }
+
+        /// <summary>
+        /// 选关界面整体美化（深色精致解谜风）：
+        /// 背景暗纹装饰、卡片圆角+阴影层次、按钮圆角、标题金色装饰线。
+        /// 纯外观改造，不改变布局与功能。
+        /// </summary>
+        private void ApplyScenePolish()
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                return;
+            }
+
+            CreateDecorativeBackground(canvas);
+            PolishCardTemplate();
+            PolishButtons();
+        }
+
+        /// <summary>背景暗纹装饰层（点阵+细斜纹，低调不抢内容）。</summary>
+        private void CreateDecorativeBackground(Canvas canvas)
+        {
+            if (canvas.transform.Find("LevelSelectDecor") != null)
+            {
+                return;
+            }
+
+            Texture2D pattern = CreatePatternTexture(64, 64);
+            Sprite patternSprite = Sprite.Create(
+                pattern,
+                new Rect(0f, 0f, 64f, 64f),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            patternSprite.texture.wrapMode = TextureWrapMode.Repeat;
+
+            GameObject decor = new GameObject("LevelSelectDecor", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            decor.layer = LayerMask.NameToLayer("UI");
+            RectTransform decorRect = (RectTransform)decor.transform;
+            decorRect.SetParent(canvas.transform, false);
+            decorRect.anchorMin = Vector2.zero;
+            decorRect.anchorMax = Vector2.one;
+            decorRect.offsetMin = Vector2.zero;
+            decorRect.offsetMax = Vector2.zero;
+            decorRect.SetSiblingIndex(1);
+
+            Image decorImage = decor.GetComponent<Image>();
+            decorImage.sprite = patternSprite;
+            decorImage.type = Image.Type.Tiled;
+            decorImage.color = Color.white;
+            decorImage.raycastTarget = false;
+        }
+
+        private static Texture2D CreatePatternTexture(int width, int height)
+        {
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.wrapMode = TextureWrapMode.Repeat;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color color = Color.clear;
+                    // 细斜纹。
+                    if ((x + y) % 24 == 0)
+                    {
+                        color = new Color(1f, 1f, 1f, 0.035f);
+                    }
+
+                    // 十字星点阵。
+                    if (x % 16 == 0 && y % 16 == 0)
+                    {
+                        color = new Color(1f, 1f, 1f, 0.09f);
+                    }
+
+                    texture.SetPixel(x, y, color);
+                }
+            }
+
+            texture.Apply();
+            return texture;
+        }
+
+        /// <summary>卡片模板美化：圆角 + 米白卡面；删除/编辑按钮圆角化。</summary>
+        private void PolishCardTemplate()
+        {
+            if (itemTemplate == null)
+            {
+                return;
+            }
+
+            Sprite cardSprite = CreateRoundedRectSprite(64, 18);
+            Image cardImage = itemTemplate.GetComponent<Image>();
+            if (cardImage != null)
+            {
+                cardImage.sprite = cardSprite;
+                cardImage.type = Image.Type.Sliced;
+                cardImage.pixelsPerUnitMultiplier = 1f;
+                cardImage.color = new Color(0.97f, 0.96f, 0.93f, 1f);
+            }
+
+            Sprite buttonSprite = CreateRoundedRectSprite(64, 10);
+            Transform labelTransform = itemTemplate.transform.Find("Label");
+            if (labelTransform != null)
+            {
+                TMP_Text label = labelTransform.GetComponent<TMP_Text>();
+                if (label != null)
+                {
+                    label.color = new Color(0.12f, 0.12f, 0.12f, 1f);
+                }
+            }
+
+            Transform deleteTransform = itemTemplate.transform.Find("DeleteButton");
+            if (deleteTransform != null)
+            {
+                Image deleteImage = deleteTransform.GetComponent<Image>();
+                if (deleteImage != null)
+                {
+                    deleteImage.sprite = buttonSprite;
+                    deleteImage.type = Image.Type.Sliced;
+                    deleteImage.pixelsPerUnitMultiplier = 1f;
+                }
+            }
+
+            Transform editTransform = itemTemplate.transform.Find("EditButton");
+            if (editTransform != null)
+            {
+                Image editImage = editTransform.GetComponent<Image>();
+                if (editImage != null)
+                {
+                    editImage.sprite = buttonSprite;
+                    editImage.type = Image.Type.Sliced;
+                    editImage.pixelsPerUnitMultiplier = 1f;
+                }
+            }
+        }
+
+        /// <summary>翻页/返回按钮圆角化（场景按钮运行时替换）。</summary>
+        private void PolishButtons()
+        {
+            Sprite buttonSprite = CreateRoundedRectSprite(64, 12);
+            ApplyRoundedSprite(prevButton, buttonSprite);
+            ApplyRoundedSprite(nextButton, buttonSprite);
+            ApplyRoundedSprite(backButton, buttonSprite);
+        }
+
+        private static void ApplyRoundedSprite(Button button, Sprite sprite)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            Image image = button.GetComponent<Image>();
+            if (image == null)
+            {
+                return;
+            }
+
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1f;
+        }
+
+        /// <summary>给实例化后的关卡卡叠加一层底部阴影（深色圆角，制造悬浮层次感）。</summary>
+        private static void AddCardShadow(GameObject item)
+        {
+            if (item == null || item.transform.Find("CardShadow") != null)
+            {
+                return;
+            }
+
+            RectTransform cardRect = (RectTransform)item.transform;
+            GameObject shadow = new GameObject("CardShadow", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            shadow.layer = LayerMask.NameToLayer("UI");
+            RectTransform shadowRect = (RectTransform)shadow.transform;
+            shadowRect.SetParent(item.transform, false);
+            // 锚点拉伸跟随卡片尺寸（不依赖布局完成时的 rect.width）。
+            shadowRect.anchorMin = Vector2.zero;
+            shadowRect.anchorMax = Vector2.one;
+            shadowRect.offsetMin = new Vector2(-5f, -5f);
+            shadowRect.offsetMax = new Vector2(5f, -9f);
+            shadowRect.SetAsFirstSibling();
+
+            Image shadowImage = shadow.GetComponent<Image>();
+            shadowImage.sprite = CreateRoundedRectSprite(64, 18);
+            shadowImage.type = Image.Type.Sliced;
+            shadowImage.pixelsPerUnitMultiplier = 1f;
+            shadowImage.color = new Color(0f, 0f, 0f, 0.28f);
+            shadowImage.raycastTarget = false;
+        }
+
+        /// <summary>生成 9-slice 圆角矩形 sprite（透明四角）。</summary>
+        private static Sprite CreateRoundedRectSprite(int size, int radius)
+        {
+            string key = "Rounded_" + radius;
+            if (spriteCache.TryGetValue(key, out Sprite cached))
+            {
+                return cached;
+            }
+
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float r = radius;
+            float rSq = r * r;
+            float cornerCenter = size - r - 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    bool inside = true;
+                    float px = x + 0.5f;
+                    float py = y + 0.5f;
+                    if (px >= cornerCenter && py >= cornerCenter)
+                    {
+                        float dx = px - cornerCenter;
+                        float dy = py - cornerCenter;
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px <= r + 0.5f && py >= cornerCenter)
+                    {
+                        float dx = px - (r + 0.5f);
+                        float dy = py - cornerCenter;
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px >= cornerCenter && py <= r + 0.5f)
+                    {
+                        float dx = px - cornerCenter;
+                        float dy = py - (r + 0.5f);
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px <= r + 0.5f && py <= r + 0.5f)
+                    {
+                        float dx = px - (r + 0.5f);
+                        float dy = py - (r + 0.5f);
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+
+                    texture.SetPixel(x, y, inside ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(r + 1f, r + 1f, r + 1f, r + 1f));
+            spriteCache[key] = sprite;
+            return sprite;
+        }
+
+        private static readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
 
         /// <summary>
         /// 在界面左侧创建 6 个难度 Tab（全部/教程/简单/中等/困难/噩梦），点击切换筛选。
@@ -97,6 +351,9 @@ namespace Murdoku
                 Image background = tabObject.GetComponent<Image>();
                 background.color = normalColor;
                 background.raycastTarget = true;
+                background.sprite = CreateRoundedRectSprite(64, 12);
+                background.type = Image.Type.Sliced;
+                background.pixelsPerUnitMultiplier = 1f;
 
                 TabClickZone zone = tabObject.AddComponent<TabClickZone>();
                 zone.Clicked = () => HandleTabClicked(captured);
@@ -222,6 +479,7 @@ namespace Murdoku
                 GameObject item = Instantiate(itemTemplate, gridRoot);
                 item.name = "PuzzleItem_" + puzzle.id;
                 item.SetActive(true);
+                AddCardShadow(item);
 
                 Transform labelTransform = item.transform.Find("Label");
                 TMP_Text label = labelTransform == null ? null : labelTransform.GetComponent<TMP_Text>();
@@ -345,7 +603,7 @@ namespace Murdoku
         {
             PuzzleSession.SelectedPuzzleId = puzzle.id;
             PuzzleSession.EditMode = false;
-            SceneManager.LoadScene("CharacterPanelTest");
+            SceneManager.LoadScene("PuzzleScene");
         }
 
         /// <summary>
@@ -355,7 +613,7 @@ namespace Murdoku
         {
             PuzzleSession.SelectedPuzzleId = puzzle.id;
             PuzzleSession.EditMode = true;
-            SceneManager.LoadScene("CharacterPanelTest");
+            SceneManager.LoadScene("PuzzleScene");
         }
 
         public void BackToMenu()

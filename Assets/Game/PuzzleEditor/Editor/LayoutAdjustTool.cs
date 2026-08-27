@@ -6,16 +6,16 @@ using UnityEngine.SceneManagement;
 namespace Murdoku.PuzzleEditor
 {
     /// <summary>
-    /// 出题场景（CharacterPanelTest）布局一键调整工具：
+    /// 出题场景（PuzzleScene）布局一键调整工具：
     /// 右侧棋盘面板收为 900×900 正方形、棋盘居中；控制条移到棋盘面板正上方；
     /// 保存面板移到棋盘面板正下方；返回按钮移到左下角；嫌疑人面板拓宽并底部留空。
     /// 直接操作内存中的场景并保存，在 Unity 内执行立即生效。
     /// </summary>
     public static class LayoutAdjustTool
     {
-        private const string ScenePath = "Assets/Scenes/CharacterPanelTest.unity";
+        private const string ScenePath = "Assets/Scenes/PuzzleScene.unity";
 
-        [MenuItem("Tools/Murdoku/Apply Board Layout (CharacterPanelTest)")]
+        [MenuItem("Tools/Murdoku/Apply Board Layout (PuzzleScene)")]
         public static void Apply()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -25,7 +25,7 @@ namespace Murdoku.PuzzleEditor
             }
 
             AdjustBoardPanel();
-            AdjustTestGrid();
+            AdjustPuzzleGrid();
             AdjustControlBar();
             AdjustSavePanel();
             AdjustBackButton();
@@ -34,19 +34,19 @@ namespace Murdoku.PuzzleEditor
             EditorSceneManager.MarkSceneDirty(scene);
             if (EditorSceneManager.SaveScene(scene))
             {
-                Debug.Log("CharacterPanelTest 布局已应用并保存。");
+                Debug.Log("PuzzleScene 布局已应用并保存。");
             }
         }
 
         private static void AdjustBoardPanel()
         {
-            RectTransform panel = FindRect("TestBoardPanel");
+            RectTransform panel = FindRect("PuzzleBoardPanel");
             if (panel == null)
             {
                 return;
             }
 
-            Undo.RecordObject(panel, "Adjust TestBoardPanel");
+            Undo.RecordObject(panel, "Adjust PuzzleBoardPanel");
             panel.anchorMin = new Vector2(0.5f, 0.5f);
             panel.anchorMax = new Vector2(0.5f, 0.5f);
             panel.pivot = new Vector2(0.5f, 0.5f);
@@ -55,15 +55,15 @@ namespace Murdoku.PuzzleEditor
             EditorUtility.SetDirty(panel);
         }
 
-        private static void AdjustTestGrid()
+        private static void AdjustPuzzleGrid()
         {
-            RectTransform grid = FindRect("TestGrid");
+            RectTransform grid = FindRect("PuzzleGrid");
             if (grid == null)
             {
                 return;
             }
 
-            Undo.RecordObject(grid, "Adjust TestGrid");
+            Undo.RecordObject(grid, "Adjust PuzzleGrid");
             grid.anchorMin = new Vector2(0.5f, 0.5f);
             grid.anchorMax = new Vector2(0.5f, 0.5f);
             grid.pivot = new Vector2(0.5f, 0.5f);

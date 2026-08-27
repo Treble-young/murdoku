@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
-    public sealed class TestBoardController : MonoBehaviour
+    public sealed class PuzzleBoardController : MonoBehaviour
     {
         public const int MinSize = 5;
         public const int MaxSize = 10;
@@ -15,7 +15,7 @@ namespace Murdoku.Characters
         [Min(MinSize)]
         [SerializeField] private int columns = 6;
         [SerializeField] private RectTransform gridRoot;
-        [SerializeField] private TestBoardCellUI cellPrefab;
+        [SerializeField] private PuzzleBoardCellUI cellPrefab;
         [SerializeField] private List<Vector2Int> blockedPositions = new List<Vector2Int>();
 
         [Header("自适应格子大小")]
@@ -26,7 +26,7 @@ namespace Murdoku.Characters
         [Min(24f)]
         [SerializeField] private float minCellSize = 40f;
 
-        private readonly List<TestBoardCellUI> cells = new List<TestBoardCellUI>();
+        private readonly List<PuzzleBoardCellUI> cells = new List<PuzzleBoardCellUI>();
 
         public event Action<ICharacterPlacementCell> CellClicked;
         public event Action<ICharacterPlacementCell> CellLongPressed;
@@ -35,7 +35,7 @@ namespace Murdoku.Characters
         /// <summary>棋盘重建完成后触发，参数为 (行数, 列数)。</summary>
         public event Action<int, int> GridGenerated;
 
-        public IReadOnlyList<TestBoardCellUI> Cells => cells;
+        public IReadOnlyList<PuzzleBoardCellUI> Cells => cells;
 
         public int Rows => rows;
 
@@ -49,7 +49,7 @@ namespace Murdoku.Characters
         /// </summary>
         public void RefreshRowColumnHighlights()
         {
-            foreach (TestBoardCellUI cell in cells)
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell != null)
                 {
@@ -62,9 +62,9 @@ namespace Murdoku.Characters
         /// 放置人物后：给该人物所在行/列的空格打上玩家禁用标记（黑叉，推理辅助）。
         /// 返回被打标记的格子列表（撤销时清除）。
         /// </summary>
-        public List<TestBoardCellUI> DisableRowColumnCells(CharacterData placed, ICharacterPlacementCell atCell)
+        public List<PuzzleBoardCellUI> DisableRowColumnCells(CharacterData placed, ICharacterPlacementCell atCell)
         {
-            List<TestBoardCellUI> disabled = new List<TestBoardCellUI>();
+            List<PuzzleBoardCellUI> disabled = new List<PuzzleBoardCellUI>();
             if (placed == null || atCell == null)
             {
                 return disabled;
@@ -72,7 +72,7 @@ namespace Murdoku.Characters
 
             int row = atCell.GridPosition.y;
             int column = atCell.GridPosition.x;
-            foreach (TestBoardCellUI cell in cells)
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell == null || cell.IsOccupied)
                 {
@@ -97,11 +97,11 @@ namespace Murdoku.Characters
         /// 放置人物后：清除该人物所在行/列上其他角色的候选标记（该行列已被占用）。
         /// 返回被清除的 (格子, 角色) 记录列表（撤销时恢复）。
         /// </summary>
-        public List<(TestBoardCellUI, CharacterData)> ClearOtherMarksInRowColumn(
+        public List<(PuzzleBoardCellUI, CharacterData)> ClearOtherMarksInRowColumn(
             CharacterData placed,
             ICharacterPlacementCell atCell)
         {
-            List<(TestBoardCellUI, CharacterData)> cleared = new List<(TestBoardCellUI, CharacterData)>();
+            List<(PuzzleBoardCellUI, CharacterData)> cleared = new List<(PuzzleBoardCellUI, CharacterData)>();
             if (placed == null || atCell == null)
             {
                 return cleared;
@@ -109,7 +109,7 @@ namespace Murdoku.Characters
 
             int row = atCell.GridPosition.y;
             int column = atCell.GridPosition.x;
-            foreach (TestBoardCellUI cell in cells)
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell == null)
                 {
@@ -140,7 +140,7 @@ namespace Murdoku.Characters
         /// </summary>
         public void ClearErrorHighlights()
         {
-            foreach (TestBoardCellUI cell in cells)
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell != null)
                 {
@@ -173,7 +173,7 @@ namespace Murdoku.Characters
 
             if (gridRoot == null || cellPrefab == null)
             {
-                Debug.LogWarning("TestBoardController is missing its grid root or cell prefab.", this);
+                Debug.LogWarning("PuzzleBoardController is missing its grid root or cell prefab.", this);
                 return;
             }
 
@@ -185,8 +185,8 @@ namespace Murdoku.Characters
                 for (int column = 0; column < columns; column++)
                 {
                     Vector2Int position = new Vector2Int(column, row);
-                    TestBoardCellUI cell = Instantiate(cellPrefab, gridRoot);
-                    cell.name = $"TestCell_{column}_{row}";
+                    PuzzleBoardCellUI cell = Instantiate(cellPrefab, gridRoot);
+                    cell.name = $"PuzzleCell_{column}_{row}";
                     cell.Configure(position, !blocked.Contains(position));
                     cell.Clicked += HandleCellClicked;
                     cell.LongPressed += HandleCellLongPressed;
@@ -231,8 +231,8 @@ namespace Murdoku.Characters
 
         private void ClearGrid()
         {
-            var generatedCells = new HashSet<TestBoardCellUI>();
-            foreach (TestBoardCellUI cell in cells)
+            var generatedCells = new HashSet<PuzzleBoardCellUI>();
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell != null)
                 {
@@ -240,10 +240,10 @@ namespace Murdoku.Characters
                 }
             }
 
-            // 域重载或编辑器验证中断后，cells 列表可能为空，但旧格子仍留在 TestGrid 下。
+            // 域重载或编辑器验证中断后，cells 列表可能为空，但旧格子仍留在 PuzzleGrid 下。
             if (gridRoot != null)
             {
-                foreach (TestBoardCellUI cell in gridRoot.GetComponentsInChildren<TestBoardCellUI>(true))
+                foreach (PuzzleBoardCellUI cell in gridRoot.GetComponentsInChildren<PuzzleBoardCellUI>(true))
                 {
                     if (cell != null)
                     {
@@ -252,7 +252,7 @@ namespace Murdoku.Characters
                 }
             }
 
-            foreach (TestBoardCellUI cell in generatedCells)
+            foreach (PuzzleBoardCellUI cell in generatedCells)
             {
                 cell.Clicked -= HandleCellClicked;
                 cell.CharacterDropped -= HandleCharacterDropped;
@@ -283,7 +283,7 @@ namespace Murdoku.Characters
 
         private void UnsubscribeFromCells()
         {
-            foreach (TestBoardCellUI cell in cells)
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell != null)
                 {
@@ -298,10 +298,10 @@ namespace Murdoku.Characters
         /// 人物放置后清空该人物在整张棋盘上的候选标记，避免残留干扰推理。
         /// 返回实际清除了标记的格子列表（供撤销放置时恢复标记）。
         /// </summary>
-        public List<TestBoardCellUI> ClearCandidateMarksFor(CharacterData character)
+        public List<PuzzleBoardCellUI> ClearCandidateMarksFor(CharacterData character)
         {
-            List<TestBoardCellUI> cleared = new List<TestBoardCellUI>();
-            foreach (TestBoardCellUI cell in cells)
+            List<PuzzleBoardCellUI> cleared = new List<PuzzleBoardCellUI>();
+            foreach (PuzzleBoardCellUI cell in cells)
             {
                 if (cell != null && cell.RemoveCandidateMark(character))
                 {

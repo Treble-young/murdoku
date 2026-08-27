@@ -418,7 +418,7 @@ GameObject:
   - component: {fileID: 3255614221248096988}
   - component: {fileID: 6425028858448068991}
   m_Layer: 5
-  m_Name: TestBoardCell
+  m_Name: PuzzleBoardCell
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -458,7 +458,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2df951f666ea84b47ad0e1e39051a90e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.TestBoardCellUI
+  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.PuzzleBoardCellUI
   button: {fileID: 3643398321198046387}
   backgroundImage: {fileID: 896467912193952976}
   coordinateText: {fileID: 4901920908968238512}
@@ -467,6 +467,7 @@ MonoBehaviour:
   portraitImage: {fileID: 1782703846658258186}
   initialText: {fileID: 2430458024855427915}
   characterNameText: {fileID: 8968401509164208296}
+  candidateMarkFont: {fileID: 11400000, guid: eb8bacd46357fb4418b3d529965e7b08, type: 2}
   lightCellColor: {r: 0.78, g: 0.88, b: 0.94, a: 1}
   darkCellColor: {r: 0.66, g: 0.79, b: 0.87, a: 1}
   blockedCellColor: {r: 0.35, g: 0.38, b: 0.42, a: 1}

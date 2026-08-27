@@ -8,7 +8,7 @@ namespace Murdoku.Characters
 {
     /// <summary>
     /// 谜题创建界面的「棋盘大小」控制条：
-    /// 输入边长（方形 N×N，范围 TestBoardController.MinSize~MaxSize），点击按钮重新生成棋盘。
+    /// 输入边长（方形 N×N，范围 PuzzleBoardController.MinSize~MaxSize），点击按钮重新生成棋盘。
     /// 参考 Murdoku Playground 的输入行列方式实现。
     /// </summary>
     public sealed class BoardSizePanelUI : MonoBehaviour
@@ -25,7 +25,7 @@ namespace Murdoku.Characters
         [SerializeField] private Color inactiveModeColor = new Color(0.35f, 0.38f, 0.45f, 1f);
 
         [Header("外部依赖")]
-        [SerializeField] private TestBoardController boardController;
+        [SerializeField] private PuzzleBoardController boardController;
         [SerializeField] private WallEditController wallEditController;
 
         [Header("提示颜色")]
@@ -73,7 +73,7 @@ namespace Murdoku.Characters
             }
         }
 
-        public void Configure(TestBoardController controller, WallEditController walls)
+        public void Configure(PuzzleBoardController controller, WallEditController walls)
         {
             boardController = controller;
             wallEditController = walls;
@@ -89,7 +89,7 @@ namespace Murdoku.Characters
 
             if (!TryParseSize(out int size))
             {
-                SetHint($"请输入 {TestBoardController.MinSize}~{TestBoardController.MaxSize} 之间的整数。", true);
+                SetHint($"请输入 {PuzzleBoardController.MinSize}~{PuzzleBoardController.MaxSize} 之间的整数。", true);
                 return;
             }
 
@@ -150,7 +150,7 @@ namespace Murdoku.Characters
                 return false;
             }
 
-            return size >= TestBoardController.MinSize && size <= TestBoardController.MaxSize;
+            return size >= PuzzleBoardController.MinSize && size <= PuzzleBoardController.MaxSize;
         }
 
         private void SetHint(string message, bool isError)

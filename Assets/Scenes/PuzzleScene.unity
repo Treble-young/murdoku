@@ -1456,7 +1456,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 1032447658}
-        m_TargetAssemblyTypeName: Murdoku.Characters.CharacterPanelTestCoordinator,
+        m_TargetAssemblyTypeName: Murdoku.Characters.PuzzleSceneCoordinator,
           Assembly-CSharp
         m_MethodName: SaveCurrentPuzzle
         m_Mode: 1
@@ -1932,7 +1932,7 @@ GameObject:
   - component: {fileID: 862296696}
   - component: {fileID: 862296697}
   m_Layer: 5
-  m_Name: TestGrid
+  m_Name: PuzzleGrid
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2129,7 +2129,7 @@ GameObject:
   - component: {fileID: 1032447659}
   - component: {fileID: 1032447658}
   m_Layer: 0
-  m_Name: CharacterPanelTestCoordinator
+  m_Name: PuzzleSceneCoordinator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2146,8 +2146,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 707b2b95a96105048a9a5196533ace7b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.CharacterPanelTestCoordinator
-  testBoard: {fileID: 1957491557}
+  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.PuzzleSceneCoordinator
+  puzzleBoard: {fileID: 1957491557}
   placementController: {fileID: 1489879039}
   wallEditController: {fileID: 405623274}
   placementStatusText: {fileID: 0}
@@ -3348,7 +3348,7 @@ GameObject:
   - component: {fileID: 1957491555}
   - component: {fileID: 1957491557}
   m_Layer: 5
-  m_Name: TestBoardPanel
+  m_Name: PuzzleBoardPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3423,7 +3423,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e31eff941184fec4492eb5f138d40572, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.TestBoardController
+  m_EditorClassIdentifier: Assembly-CSharp::Murdoku.Characters.PuzzleBoardController
   rows: 6
   columns: 6
   gridRoot: {fileID: 862296696}

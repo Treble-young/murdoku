@@ -45,7 +45,7 @@ namespace Murdoku.PuzzleEditor
         private static readonly Color FrameColor = new Color(0.62f, 0.70f, 0.85f, 1f);
         private static readonly Color HoverColor = new Color(1f, 0.62f, 0.22f, 1f);
 
-        [SerializeField] private TestBoardController board;
+        [SerializeField] private PuzzleBoardController board;
 
         private readonly List<BorderButton> borders = new List<BorderButton>();
         private readonly List<Image> frames = new List<Image>();
@@ -186,7 +186,7 @@ namespace Murdoku.PuzzleEditor
             RebuildForCurrentBoard();
         }
 
-        public void SetBoard(TestBoardController controller)
+        public void SetBoard(PuzzleBoardController controller)
         {
             if (board == controller)
             {
@@ -598,7 +598,7 @@ namespace Murdoku.PuzzleEditor
 
             bool editWalls = mode == EditorMode.EditWalls;
 
-            foreach (TestBoardCellUI cell in board.Cells)
+            foreach (PuzzleBoardCellUI cell in board.Cells)
             {
                 if (cell == null)
                 {
@@ -627,7 +627,7 @@ namespace Murdoku.PuzzleEditor
             else
             {
                 hoveredBorders.Clear();
-                foreach (TestBoardCellUI cell in board.Cells)
+                foreach (PuzzleBoardCellUI cell in board.Cells)
                 {
                     if (cell == null)
                     {
@@ -723,7 +723,7 @@ namespace Murdoku.PuzzleEditor
             // 游玩模式/放置模式下即使载入了墙状态，也要清除叠加层，避免棋盘出现半透明色块。
             if (mode != EditorMode.EditWalls)
             {
-                foreach (TestBoardCellUI cell in board.Cells)
+                foreach (PuzzleBoardCellUI cell in board.Cells)
                 {
                     if (cell != null)
                     {
@@ -738,7 +738,7 @@ namespace Murdoku.PuzzleEditor
             int columns = board.Columns;
             for (int index = 0; index < board.Cells.Count; index++)
             {
-                TestBoardCellUI cell = board.Cells[index];
+                PuzzleBoardCellUI cell = board.Cells[index];
                 if (cell == null)
                 {
                     continue;

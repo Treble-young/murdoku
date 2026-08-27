@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace Murdoku.Characters.Editor
 {
-    public static class CharacterPanelTestBuilder
+    public static class PuzzleSceneBuilder
     {
         private const string RequiredUnityVersion = "6000.3.20f1";
         private const string Root = "Assets/Game/Characters";
@@ -23,9 +23,9 @@ namespace Murdoku.Characters.Editor
         private const string PrefabRoot = Root + "/Prefabs";
         private const string PortraitRoot = Root + "/Art/Portraits";
         private const string PortraitCatalogPath = DataRoot + "/CharacterPortraitCatalog.asset";
-        private const string ScenePath = "Assets/Scenes/CharacterPanelTest.unity";
+        private const string ScenePath = "Assets/Scenes/PuzzleScene.unity";
         private const string AutoPlayCommandLineFlag = "-murdokuCharacterPanelPlay";
-        private const string AutoPlaySessionKey = "Murdoku.CharacterPanelTest.AutoPlayStarted";
+        private const string AutoPlaySessionKey = "Murdoku.PuzzleScene.AutoPlayStarted";
 
         private static TMP_FontAsset cachedFont;
 
@@ -153,11 +153,11 @@ namespace Murdoku.Characters.Editor
 
             EditorApplication.update -= OpenCommandLineSceneWhenReady;
             SessionState.SetBool(AutoPlaySessionKey, true);
-            OpenCharacterPanelTestAndPlay();
+            OpenPuzzleSceneAndPlay();
         }
 
-        [MenuItem("Tools/Murdoku/Build Character Panel Test")]
-        public static void BuildCharacterPanelTest()
+        [MenuItem("Tools/Murdoku/Build Puzzle Scene")]
+        public static void BuildPuzzleScene()
         {
             RequireExactEditorVersion();
             EnsureFolders();
@@ -181,7 +181,7 @@ namespace Murdoku.Characters.Editor
 
             CreateCharacterCardPrefab();
             CreateCharacterPanelPrefab();
-            CreateTestBoardCellPrefab();
+            CreatePuzzleBoardCellPrefab();
             CreateBoardSizePanelPrefab();
 
             // Flush temporary scene-object identities before loading the saved prefabs.
@@ -193,11 +193,11 @@ namespace Murdoku.Characters.Editor
                 $"{PrefabRoot}/CharacterCard.prefab");
             CreateCharacterSystemPrefab(cardPrefab, portraitCatalog);
 
-            CreateTestScene();
+            CreatePuzzleScene();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log($"Character panel test assets created at {Root} and {ScenePath}.");
+            Debug.Log($"Puzzle scene assets created at {Root} and {ScenePath}.");
         }
 
         [MenuItem("Tools/Murdoku/Setup Character Portraits")]
@@ -212,8 +212,8 @@ namespace Murdoku.Characters.Editor
             Debug.Log("Character portrait catalog and CharacterSystem.prefab reference are ready.");
         }
 
-        [MenuItem("Tools/Murdoku/Validate Character Panel Test")]
-        public static void ValidateCharacterPanelTest()
+        [MenuItem("Tools/Murdoku/Validate Puzzle Scene")]
+        public static void ValidatePuzzleScene()
         {
             RequireExactEditorVersion();
             Scene activeSceneBefore = SceneManager.GetActiveScene();
@@ -229,9 +229,9 @@ namespace Murdoku.Characters.Editor
             Camera[] cameras = FindSceneComponents<Camera>(scene);
             EventSystem[] eventSystems = FindSceneComponents<EventSystem>(scene);
             Canvas[] canvases = FindSceneComponents<Canvas>(scene);
-            Require(cameras.Length == 1, "The test scene must contain exactly one Camera.");
-            Require(eventSystems.Length == 1, "The test scene must contain exactly one EventSystem.");
-            Require(canvases.Length == 1, "The test scene must contain exactly one Canvas.");
+            Require(cameras.Length == 1, "The puzzle scene must contain exactly one Camera.");
+            Require(eventSystems.Length == 1, "The puzzle scene must contain exactly one EventSystem.");
+            Require(canvases.Length == 1, "The puzzle scene must contain exactly one Canvas.");
             Require(
                 eventSystems[0].GetComponent<InputSystemUIInputModule>() != null,
                 "The EventSystem must use InputSystemUIInputModule.");
@@ -239,8 +239,8 @@ namespace Murdoku.Characters.Editor
             CharacterPanelView panelView = FindSingleSceneComponent<CharacterPanelView>(scene);
             CharacterPanelUI panelUI = FindSingleSceneComponent<CharacterPanelUI>(scene);
             CharacterPlacementController placement = FindSingleSceneComponent<CharacterPlacementController>(scene);
-            TestBoardController board = FindSingleSceneComponent<TestBoardController>(scene);
-            FindSingleSceneComponent<CharacterPanelTestCoordinator>(scene);
+            PuzzleBoardController board = FindSingleSceneComponent<PuzzleBoardController>(scene);
+            FindSingleSceneComponent<PuzzleSceneCoordinator>(scene);
 
             Require(panelView.CharacterGrid != null, "CharacterPanelView.CharacterGrid is not assigned.");
             SerializedObject panelSerialized = new SerializedObject(panelUI);
@@ -250,7 +250,7 @@ namespace Murdoku.Characters.Editor
                 panelSerialized.FindProperty("portraitCatalog").objectReferenceValue as CharacterPortraitCatalog;
             Require(portraitCatalog != null, "CharacterPanelUI.PortraitCatalog is not assigned.");
             Require(portraitCatalog.Entries.Count == 12, "The portrait catalog must contain twelve portraits.");
-            Require(panelSerialized.FindProperty("characters").arraySize == 3, "CharacterPanelUI must contain three test characters.");
+            Require(panelSerialized.FindProperty("characters").arraySize == 3, "CharacterPanelUI must contain three starter characters.");
 
             foreach (int boardSize in new[] { 5, 6, 10 })
             {
@@ -263,15 +263,15 @@ namespace Murdoku.Characters.Editor
             ValidateGenderTogglePortraitFallback(portraitCatalog);
 
             SerializedObject boardSerialized = new SerializedObject(board);
-            Require(boardSerialized.FindProperty("rows").intValue == 6, "Test board row count must be 6.");
-            Require(boardSerialized.FindProperty("columns").intValue == 6, "Test board column count must be 6.");
-            Require(boardSerialized.FindProperty("gridRoot").objectReferenceValue != null, "TestBoardController.GridRoot is not assigned.");
-            Require(boardSerialized.FindProperty("cellPrefab").objectReferenceValue != null, "TestBoardController.CellPrefab is not assigned.");
-            RectTransform testGridRect = boardSerialized.FindProperty("gridRoot").objectReferenceValue as RectTransform;
+            Require(boardSerialized.FindProperty("rows").intValue == 6, "Puzzle board row count must be 6.");
+            Require(boardSerialized.FindProperty("columns").intValue == 6, "Puzzle board column count must be 6.");
+            Require(boardSerialized.FindProperty("gridRoot").objectReferenceValue != null, "PuzzleBoardController.GridRoot is not assigned.");
+            Require(boardSerialized.FindProperty("cellPrefab").objectReferenceValue != null, "PuzzleBoardController.CellPrefab is not assigned.");
+            RectTransform puzzleGridRect = boardSerialized.FindProperty("gridRoot").objectReferenceValue as RectTransform;
             Require(
-                testGridRect != null && Mathf.Approximately(testGridRect.sizeDelta.x, 850f) &&
-                Mathf.Approximately(testGridRect.sizeDelta.y, 850f),
-                "TestGrid sizeDelta must be 850×850.");
+                puzzleGridRect != null && Mathf.Approximately(puzzleGridRect.sizeDelta.x, 850f) &&
+                Mathf.Approximately(puzzleGridRect.sizeDelta.y, 850f),
+                "PuzzleGrid sizeDelta must be 850×850.");
 
             BoardSizePanelUI boardSizePanel = FindSingleSceneComponent<BoardSizePanelUI>(scene);
             SerializedObject sizeSerialized = new SerializedObject(boardSizePanel);
@@ -280,33 +280,33 @@ namespace Murdoku.Characters.Editor
             Require(sizeSerialized.FindProperty("hintText").objectReferenceValue != null, "BoardSizePanelUI.HintText is not assigned.");
             Require(sizeSerialized.FindProperty("placeModeButton").objectReferenceValue != null, "BoardSizePanelUI.PlaceModeButton is not assigned.");
             Require(sizeSerialized.FindProperty("wallModeButton").objectReferenceValue != null, "BoardSizePanelUI.WallModeButton is not assigned.");
-            Require(sizeSerialized.FindProperty("boardController").objectReferenceValue == board, "BoardSizePanelUI.BoardController is not assigned to the test board.");
+            Require(sizeSerialized.FindProperty("boardController").objectReferenceValue == board, "BoardSizePanelUI.BoardController is not assigned to the puzzle board.");
             Require(sizeSerialized.FindProperty("wallEditController").objectReferenceValue != null, "BoardSizePanelUI.WallEditController is not assigned.");
 
             WallEditController wallEdit = FindSingleSceneComponent<WallEditController>(scene);
             SerializedObject wallSerialized = new SerializedObject(wallEdit);
-            Require(wallSerialized.FindProperty("board").objectReferenceValue == board, "WallEditController.Board is not assigned to the test board.");
+            Require(wallSerialized.FindProperty("board").objectReferenceValue == board, "WallEditController.Board is not assigned to the puzzle board.");
 
             string[] dependencies = AssetDatabase.GetDependencies(ScenePath, true);
             foreach (string dependency in dependencies)
             {
-                Require(dependency != "Assets/Scenes/Level01.unity", "The test scene must not depend on Level01.unity.");
-                Require(dependency != "Assets/Gridmap/Scripts/GridManager.cs", "The test scene must not depend on GridManager.cs.");
-                Require(dependency != "Assets/Gridmap/Scripts/Tile.cs", "The test scene must not depend on Tile.cs.");
-                Require(dependency != "Assets/Tile.prefab", "The test scene must not depend on Tile.prefab.");
+                Require(dependency != "Assets/Scenes/Level01.unity", "The puzzle scene must not depend on Level01.unity.");
+                Require(dependency != "Assets/Gridmap/Scripts/GridManager.cs", "The puzzle scene must not depend on GridManager.cs.");
+                Require(dependency != "Assets/Gridmap/Scripts/Tile.cs", "The puzzle scene must not depend on Tile.cs.");
+                Require(dependency != "Assets/Tile.prefab", "The puzzle scene must not depend on Tile.prefab.");
             }
 
             GameObject panelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabRoot}/CharacterPanel.prefab");
             Require(panelPrefab != null, "CharacterPanel.prefab is missing.");
             Require(panelPrefab.GetComponentInChildren<Camera>(true) == null, "CharacterPanel.prefab must not contain a Camera.");
             Require(panelPrefab.GetComponentInChildren<EventSystem>(true) == null, "CharacterPanel.prefab must not contain an EventSystem.");
-            Require(panelPrefab.GetComponentInChildren<TestBoardController>(true) == null, "CharacterPanel.prefab must not contain a test board.");
+            Require(panelPrefab.GetComponentInChildren<PuzzleBoardController>(true) == null, "CharacterPanel.prefab must not contain a puzzle board.");
 
             GameObject systemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabRoot}/CharacterSystem.prefab");
             Require(systemPrefab != null, "CharacterSystem.prefab is missing.");
             Require(systemPrefab.GetComponentInChildren<CharacterPanelUI>(true) != null, "CharacterSystem.prefab is missing CharacterPanelUI.");
             Require(systemPrefab.GetComponentInChildren<CharacterPlacementController>(true) != null, "CharacterSystem.prefab is missing CharacterPlacementController.");
-            Require(systemPrefab.GetComponentInChildren<TestBoardController>(true) == null, "CharacterSystem.prefab must not reference the test board.");
+            Require(systemPrefab.GetComponentInChildren<PuzzleBoardController>(true) == null, "CharacterSystem.prefab must not reference the puzzle board.");
 
             foreach (GameObject rootObject in scene.GetRootGameObjects())
             {
@@ -334,8 +334,8 @@ namespace Murdoku.Characters.Editor
             Require(panelUI.SelectedCharacter == leoCard.Character, "Leo must be selectable again after toggling off.");
 
             board.GenerateGrid();
-            Require(board.Cells.Count == 36, "TestBoardController must generate 36 cells.");
-            Require(board.Cells[0] is IDropHandler, "Test board cells must accept character drops.");
+            Require(board.Cells.Count == 36, "PuzzleBoardController must generate 36 cells.");
+            Require(board.Cells[0] is IDropHandler, "Puzzle board cells must accept character drops.");
             placement.SetSelectionSource(null);
             placement.SetSelectionSource(panelUI);
             Require(
@@ -405,7 +405,7 @@ namespace Murdoku.Characters.Editor
                 if (buildScene.path == ScenePath && buildScene.enabled)
                 {
                     Debug.LogWarning(
-                        "CharacterPanelTest is currently enabled in Build Settings. " +
+                        "PuzzleScene is currently enabled in Build Settings. " +
                         "The character-system validator intentionally leaves ProjectSettings unchanged.");
                 }
             }
@@ -414,7 +414,7 @@ namespace Murdoku.Characters.Editor
                 ValidateGeneratedLayout(panelUI, panelView, board, 6);
                 ValidateGeneratedLayout(panelUI, panelView, board, 10);
 
-                Debug.Log("CharacterPanelTest validation passed: portrait uniqueness/gender matching, hierarchy, X ordering, duplicate cleanup, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
+                Debug.Log("PuzzleScene validation passed: portrait uniqueness/gender matching, hierarchy, X ordering, duplicate cleanup, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
             }
             finally
             {
@@ -437,7 +437,7 @@ namespace Murdoku.Characters.Editor
         private static void ValidateGeneratedLayout(
             CharacterPanelUI panelUI,
             CharacterPanelView panelView,
-            TestBoardController board,
+            PuzzleBoardController board,
             int boardSize)
         {
             // 连续重建两次，验证清理逻辑不依赖运行时缓存列表，也不会叠加旧对象。
@@ -447,8 +447,8 @@ namespace Murdoku.Characters.Editor
             panelUI.RebuildSuspects(boardSize);
 
             int expectedCellCount = boardSize * boardSize;
-            TestBoardCellUI[] generatedCells =
-                board.GridRoot.GetComponentsInChildren<TestBoardCellUI>(true);
+            PuzzleBoardCellUI[] generatedCells =
+                board.GridRoot.GetComponentsInChildren<PuzzleBoardCellUI>(true);
             CharacterCardUI[] generatedCards =
                 panelView.CharacterGrid.GetComponentsInChildren<CharacterCardUI>(true);
 
@@ -551,8 +551,8 @@ namespace Murdoku.Characters.Editor
             }
         }
 
-        [MenuItem("Tools/Murdoku/Open Character Panel Test and Play")]
-        public static void OpenCharacterPanelTestAndPlay()
+        [MenuItem("Tools/Murdoku/Open Puzzle Scene and Play")]
+        public static void OpenPuzzleSceneAndPlay()
         {
             RequireExactEditorVersion();
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -560,7 +560,7 @@ namespace Murdoku.Characters.Editor
             {
                 EditorApplication.ExecuteMenuItem("Window/General/Game");
                 EditorApplication.isPlaying = true;
-                Debug.Log("Opened CharacterPanelTest.unity and entered Play Mode.");
+                Debug.Log("Opened PuzzleScene.unity and entered Play Mode.");
             };
         }
 
@@ -576,9 +576,9 @@ namespace Murdoku.Characters.Editor
             DestroySceneObjectsByName(scene, "PlacementStatusText");
 
             // 2. 调整棋盘区域为 850×850：在不遮挡底部保存面板的前提下尽可能大。
-            RectTransform testGrid = FindChildByName<RectTransform>(scene, "TestGrid");
-            Require(testGrid != null, "CharacterPanelTest is missing the TestGrid.");
-            testGrid.sizeDelta = new Vector2(850f, 850f);
+            RectTransform puzzleGrid = FindChildByName<RectTransform>(scene, "PuzzleGrid");
+            Require(puzzleGrid != null, "PuzzleScene is missing the PuzzleGrid.");
+            puzzleGrid.sizeDelta = new Vector2(850f, 850f);
 
             // 3. 优先复用现有 prefab（避免运行时强制重写资源被锁），缺失时才生成。
             GameObject boardSizePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
@@ -598,7 +598,7 @@ namespace Murdoku.Characters.Editor
                 $"Failed to load {PrefabRoot}/BoardSizePanel.prefab.");
 
             // 4. 先实例化新的控制条并完成绑定（失败时旧控制条仍保留，不会丢失）。
-            TestBoardController board = FindSingleSceneComponent<TestBoardController>(scene);
+            PuzzleBoardController board = FindSingleSceneComponent<PuzzleBoardController>(scene);
             SetFloat(board, "maxCellSize", 128f);
 
             WallEditController[] existingWalls = FindSceneComponents<WallEditController>(scene);
@@ -658,7 +658,7 @@ namespace Murdoku.Characters.Editor
             }
         }
 
-        [MenuItem("Tools/Murdoku/Focus Character Panel Game View %#g")]
+        [MenuItem("Tools/Murdoku/Focus Puzzle Scene Game View %#g")]
         public static void FocusCharacterPanelGameView()
         {
             Type gameViewType = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
@@ -666,7 +666,7 @@ namespace Murdoku.Characters.Editor
             gameView.Show();
             gameView.Focus();
             gameView.Repaint();
-            Debug.Log("Focused the CharacterPanelTest Game view.");
+            Debug.Log("Focused the PuzzleScene Game view.");
         }
 
         private static void RequireExactEditorVersion()
@@ -674,7 +674,7 @@ namespace Murdoku.Characters.Editor
             if (!string.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"CharacterPanelTestBuilder requires Unity {RequiredUnityVersion}. " +
+                    $"PuzzleSceneBuilder requires Unity {RequiredUnityVersion}. " +
                     $"The current editor is {Application.unityVersion}; generation was cancelled to protect ProjectSettings.");
             }
 
@@ -696,7 +696,7 @@ namespace Murdoku.Characters.Editor
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Data"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Placement"));
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "UI"));
-            Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Test"));
+            Directory.CreateDirectory(Path.Combine(Application.dataPath, "Game", "Characters", "Scripts", "Board"));
             AssetDatabase.Refresh();
         }
 
@@ -997,9 +997,9 @@ namespace Murdoku.Characters.Editor
             return saved;
         }
 
-        private static TestBoardCellUI CreateTestBoardCellPrefab()
+        private static PuzzleBoardCellUI CreatePuzzleBoardCellPrefab()
         {
-            RectTransform root = CreateRect("TestBoardCell", null);
+            RectTransform root = CreateRect("PuzzleBoardCell", null);
             root.sizeDelta = new Vector2(112f, 112f);
 
             Image background = AddImage("Background", root, new Color(0.78f, 0.88f, 0.94f, 1f));
@@ -1055,7 +1055,7 @@ namespace Murdoku.Characters.Editor
             colors.disabledColor = new Color(0.35f, 0.38f, 0.42f, 1f);
             button.colors = colors;
 
-            TestBoardCellUI cell = root.gameObject.AddComponent<TestBoardCellUI>();
+            PuzzleBoardCellUI cell = root.gameObject.AddComponent<PuzzleBoardCellUI>();
             SetReference(cell, "button", button);
             SetReference(cell, "backgroundImage", background);
             SetReference(cell, "coordinateText", coordinate);
@@ -1064,10 +1064,11 @@ namespace Murdoku.Characters.Editor
             SetReference(cell, "portraitImage", portraitImage);
             SetReference(cell, "initialText", initialText);
             SetReference(cell, "characterNameText", nameText);
+            SetReference(cell, "candidateMarkFont", Font);
             tokenRoot.gameObject.SetActive(false);
 
-            TestBoardCellUI saved = SavePrefab(root.gameObject, $"{PrefabRoot}/TestBoardCell.prefab")
-                .GetComponent<TestBoardCellUI>();
+            PuzzleBoardCellUI saved = SavePrefab(root.gameObject, $"{PrefabRoot}/PuzzleBoardCell.prefab")
+                .GetComponent<PuzzleBoardCellUI>();
             return saved;
         }
 
@@ -1110,7 +1111,7 @@ namespace Murdoku.Characters.Editor
             TMP_Text placeholder = AddText(
                 "Placeholder",
                 inputBackground.rectTransform,
-                $"{TestBoardController.MinSize}~{TestBoardController.MaxSize}",
+                $"{PuzzleBoardController.MinSize}~{PuzzleBoardController.MaxSize}",
                 18f,
                 new Color(0.45f, 0.50f, 0.58f, 1f),
                 TextAlignmentOptions.Center);
@@ -1240,7 +1241,7 @@ namespace Murdoku.Characters.Editor
             return saved;
         }
 
-        private static void CreateTestScene()
+        private static void CreatePuzzleScene()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             AssetDatabase.SaveAssets();
@@ -1250,8 +1251,8 @@ namespace Murdoku.Characters.Editor
                 $"{PrefabRoot}/CharacterPanel.prefab");
             CharacterCardUI cardPrefab = LoadPrefabComponent<CharacterCardUI>(
                 $"{PrefabRoot}/CharacterCard.prefab");
-            TestBoardCellUI cellPrefab = LoadPrefabComponent<TestBoardCellUI>(
-                $"{PrefabRoot}/TestBoardCell.prefab");
+            PuzzleBoardCellUI cellPrefab = LoadPrefabComponent<PuzzleBoardCellUI>(
+                $"{PrefabRoot}/PuzzleBoardCell.prefab");
             GameObject systemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 $"{PrefabRoot}/CharacterSystem.prefab");
             if (systemPrefab == null)
@@ -1300,12 +1301,12 @@ namespace Murdoku.Characters.Editor
             panelRect.sizeDelta = new Vector2(610f, -40f);
             panelRect.anchoredPosition = new Vector2(20f, 0f);
 
-            Image boardPanel = AddImage("TestBoardPanel", canvasObject.GetComponent<RectTransform>(), new Color(0.11f, 0.14f, 0.20f, 0.96f));
+            Image boardPanel = AddImage("PuzzleBoardPanel", canvasObject.GetComponent<RectTransform>(), new Color(0.11f, 0.14f, 0.20f, 0.96f));
             Stretch(boardPanel.rectTransform, Vector2.zero, Vector2.one, new Vector2(650f, 20f), new Vector2(-20f, -20f));
 
-            RectTransform testGrid = CreateRect("TestGrid", boardPanel.rectTransform);
-            Place(testGrid, new Vector2(0.5f, 0.5f), new Vector2(850f, 850f), new Vector2(0f, -35f));
-            GridLayoutGroup boardLayout = testGrid.gameObject.AddComponent<GridLayoutGroup>();
+            RectTransform puzzleGrid = CreateRect("PuzzleGrid", boardPanel.rectTransform);
+            Place(puzzleGrid, new Vector2(0.5f, 0.5f), new Vector2(850f, 850f), new Vector2(0f, -35f));
+            GridLayoutGroup boardLayout = puzzleGrid.gameObject.AddComponent<GridLayoutGroup>();
             boardLayout.cellSize = new Vector2(112f, 112f);
             boardLayout.spacing = new Vector2(8f, 8f);
             boardLayout.startCorner = GridLayoutGroup.Corner.UpperLeft;
@@ -1314,10 +1315,10 @@ namespace Murdoku.Characters.Editor
             boardLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             boardLayout.constraintCount = 6;
 
-            TestBoardController boardController = boardPanel.gameObject.AddComponent<TestBoardController>();
+            PuzzleBoardController boardController = boardPanel.gameObject.AddComponent<PuzzleBoardController>();
             SetInt(boardController, "rows", 6);
             SetInt(boardController, "columns", 6);
-            SetReference(boardController, "gridRoot", testGrid);
+            SetReference(boardController, "gridRoot", puzzleGrid);
             SetReference(boardController, "cellPrefab", cellPrefab);
 
             GameObject wallObject = new GameObject("WallEditController");
@@ -1345,9 +1346,9 @@ namespace Murdoku.Characters.Editor
             SetReference(panelUI, "cardPrefab", cardPrefab);
             SetObjectArray(panelUI, "characters", characters);
 
-            GameObject coordinatorObject = new GameObject("CharacterPanelTestCoordinator");
-            CharacterPanelTestCoordinator coordinator = coordinatorObject.AddComponent<CharacterPanelTestCoordinator>();
-            SetReference(coordinator, "testBoard", boardController);
+            GameObject coordinatorObject = new GameObject("PuzzleSceneCoordinator");
+            PuzzleSceneCoordinator coordinator = coordinatorObject.AddComponent<PuzzleSceneCoordinator>();
+            SetReference(coordinator, "puzzleBoard", boardController);
             SetReference(coordinator, "placementController", placement);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -1502,7 +1503,7 @@ namespace Murdoku.Characters.Editor
         private static T FindSingleSceneComponent<T>(Scene scene) where T : Component
         {
             T[] components = FindSceneComponents<T>(scene);
-            Require(components.Length == 1, $"The test scene must contain exactly one {typeof(T).Name}.");
+            Require(components.Length == 1, $"The puzzle scene must contain exactly one {typeof(T).Name}.");
             return components[0];
         }
 

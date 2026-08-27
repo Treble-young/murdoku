@@ -16,7 +16,7 @@ namespace Murdoku.PuzzleEditor
     /// </summary>
     public static class LeftPanelTabsBuilder
     {
-        private const string ScenePath = "Assets/Scenes/CharacterPanelTest.unity";
+        private const string ScenePath = "Assets/Scenes/PuzzleScene.unity";
         private const string FontPath = "Assets/fonts/敏锐念念不忘体 SDF.asset";
         private const string CharacterPanelPrefabPath = "Assets/Game/Characters/Prefabs/CharacterPanel.prefab";
 

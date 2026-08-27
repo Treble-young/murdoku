@@ -127,6 +127,106 @@ namespace Murdoku.Characters
             }
 
             SetupGenderToggle();
+            ApplyRoundedCard();
+        }
+
+        /// <summary>卡片背景改为圆角（9-slice 圆角 sprite，编辑/游玩界面统一）。</summary>
+        private void ApplyRoundedCard()
+        {
+            // 卡片背景可能是根 Image，也可能是子物体 CardBackground 的 Image（prefab 结构）。
+            Image cardImage = GetComponent<Image>();
+            if (cardImage == null)
+            {
+                Transform background = transform.Find("CardBackground");
+                if (background != null)
+                {
+                    cardImage = background.GetComponent<Image>();
+                }
+            }
+
+            if (cardImage == null)
+            {
+                return;
+            }
+
+            cardImage.sprite = GetRoundedCardSprite();
+            cardImage.type = Image.Type.Sliced;
+            cardImage.pixelsPerUnitMultiplier = 1f;
+
+            // 选中边框同样圆角化（半径略大，贴合卡片）。
+            if (selectionBorder != null)
+            {
+                Image borderImage = selectionBorder.GetComponent<Image>();
+                if (borderImage != null)
+                {
+                    borderImage.sprite = GetRoundedCardSprite();
+                    borderImage.type = Image.Type.Sliced;
+                    borderImage.pixelsPerUnitMultiplier = 1f;
+                }
+            }
+        }
+
+        private static Sprite roundedCardSprite;
+
+        private static Sprite GetRoundedCardSprite()
+        {
+            if (roundedCardSprite != null)
+            {
+                return roundedCardSprite;
+            }
+
+            const int size = 64;
+            const int radius = 16;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float r = radius;
+            float rSq = r * r;
+            float cornerCenter = size - r - 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    bool inside = true;
+                    float px = x + 0.5f;
+                    float py = y + 0.5f;
+                    if (px >= cornerCenter && py >= cornerCenter)
+                    {
+                        float dx = px - cornerCenter;
+                        float dy = py - cornerCenter;
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px <= r + 0.5f && py >= cornerCenter)
+                    {
+                        float dx = px - (r + 0.5f);
+                        float dy = py - cornerCenter;
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px >= cornerCenter && py <= r + 0.5f)
+                    {
+                        float dx = px - cornerCenter;
+                        float dy = py - (r + 0.5f);
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+                    else if (px <= r + 0.5f && py <= r + 0.5f)
+                    {
+                        float dx = px - (r + 0.5f);
+                        float dy = py - (r + 0.5f);
+                        inside = dx * dx + dy * dy <= rSq;
+                    }
+
+                    texture.SetPixel(x, y, inside ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            roundedCardSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(r + 1f, r + 1f, r + 1f, r + 1f));
+            return roundedCardSprite;
         }
 
         private void OnDestroy()
@@ -360,6 +460,9 @@ namespace Murdoku.Characters
                     typeof(Image));
                 overlayObject.layer = gameObject.layer;
                 placedDimOverlay = overlayObject.GetComponent<Image>();
+                placedDimOverlay.sprite = GetRoundedCardSprite();
+                placedDimOverlay.type = Image.Type.Sliced;
+                placedDimOverlay.pixelsPerUnitMultiplier = 1f;
             }
 
             RectTransform overlayRect = placedDimOverlay.rectTransform;

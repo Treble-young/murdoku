@@ -36,7 +36,7 @@ public class MainMenuManager : MonoBehaviour
     public void OnCreatePuzzle()
     {
         Murdoku.PuzzleSession.SelectedPuzzleId = null;
-        SceneManager.LoadScene("CharacterPanelTest");
+        SceneManager.LoadScene("PuzzleScene");
     }
 
     public void OnQuitGame()

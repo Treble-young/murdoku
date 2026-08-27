@@ -7,12 +7,15 @@ using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
-    public sealed class TestBoardCellUI : MonoBehaviour, ICharacterPlacementCell,
+    public sealed class PuzzleBoardCellUI : MonoBehaviour, ICharacterPlacementCell,
         IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler,
         IPointerDownHandler, IPointerUpHandler
     {
         private const float LongPressSeconds = 0.6f;
         private const float RingShowDelay = 0.15f;
+        private const int CandidateMarkColumns = 3;
+        private const int CandidateMarkRows = 3;
+        private const int MaxVisibleCandidateMarks = CandidateMarkColumns * CandidateMarkRows;
 
         [Header("Cell")]
         [SerializeField] private Button button;
@@ -25,6 +28,7 @@ namespace Murdoku.Characters
         [SerializeField] private Image portraitImage;
         [SerializeField] private TMP_Text initialText;
         [SerializeField] private TMP_Text characterNameText;
+        [SerializeField] private TMP_FontAsset candidateMarkFont;
 
         [Header("Colors")]
         [SerializeField] private Color lightCellColor = new Color(0.78f, 0.88f, 0.94f, 1f);
@@ -192,76 +196,80 @@ namespace Murdoku.Characters
             candidateMarkChips.Clear();
 
             RectTransform cellRect = (RectTransform)transform;
-            float cellSize = Mathf.Min(cellRect.rect.width, cellRect.rect.height);
-            float chipSize = Mathf.Clamp(cellSize * 0.8f, 40f, 75f);
-            float x = 2f;
+            const float gridPadding = 3f;
+            float slotWidth = Mathf.Max(
+                1f,
+                (cellRect.rect.width - gridPadding * 2f) / CandidateMarkColumns);
+            float slotHeight = Mathf.Max(
+                1f,
+                (cellRect.rect.height - gridPadding * 2f) / CandidateMarkRows);
+            float fontSize = Mathf.Clamp(Mathf.Min(slotWidth, slotHeight) * 0.88f, 20f, 42f);
+            int visibleIndex = 0;
             for (int index = 0; index < candidateMarks.Count; index++)
             {
-                CharacterData character = candidateMarks[index];
-                bool hasPortrait = character != null && character.Portrait != null;
+                if (visibleIndex >= MaxVisibleCandidateMarks)
+                {
+                    break;
+                }
 
-                GameObject chip = new GameObject(
-                    "MarkChip",
+                CharacterData character = candidateMarks[index];
+                if (character == null || character.Initial.Length == 0)
+                {
+                    continue;
+                }
+
+                int column = visibleIndex % CandidateMarkColumns;
+                int row = visibleIndex / CandidateMarkColumns;
+
+                // 纯字母标记：无底色徽章，使用 NotoSansSC 加粗显示角色首字母，颜色与人物卡一致。
+                // 黑色描边确保不同颜色的字母在明暗地块和道具上都清晰可辨。
+                GameObject letterObject = new GameObject(
+                    "MarkLetter",
                     typeof(RectTransform),
                     typeof(CanvasRenderer),
-                    typeof(Image));
-                chip.layer = LayerMask.NameToLayer("UI");
-                RectTransform chipRect = chip.GetComponent<RectTransform>();
-                chipRect.SetParent(transform, false);
-                chipRect.anchorMin = new Vector2(0f, 1f);
-                chipRect.anchorMax = new Vector2(0f, 1f);
-                chipRect.pivot = new Vector2(0f, 1f);
-                chipRect.anchoredPosition = new Vector2(x, -2f);
-                chipRect.sizeDelta = new Vector2(chipSize, chipSize);
+                    typeof(TextMeshProUGUI));
+                letterObject.layer = LayerMask.NameToLayer("UI");
+                RectTransform letterRect = letterObject.GetComponent<RectTransform>();
+                letterRect.SetParent(transform, false);
+                letterRect.anchorMin = new Vector2(0f, 1f);
+                letterRect.anchorMax = new Vector2(0f, 1f);
+                letterRect.pivot = new Vector2(0f, 1f);
+                letterRect.anchoredPosition = new Vector2(
+                    gridPadding + column * slotWidth,
+                    -(gridPadding + row * slotHeight));
+                letterRect.sizeDelta = new Vector2(slotWidth, slotHeight);
 
-                Image chipImage = chip.GetComponent<Image>();
-                chipImage.raycastTarget = false;
-                if (hasPortrait)
+                TextMeshProUGUI label = letterObject.GetComponent<TextMeshProUGUI>();
+                if (candidateMarkFont != null)
                 {
-                    chipImage.sprite = character.Portrait;
-                    chipImage.color = new Color(1f, 1f, 1f, 0.45f);
-                }
-                else
-                {
-                    Color baseColor = character == null ? Color.gray : character.PlaceholderColor;
-                    chipImage.color = new Color(
-                        baseColor.r * 0.7f,
-                        baseColor.g * 0.7f,
-                        baseColor.b * 0.7f,
-                        0.38f);
+                    label.font = candidateMarkFont;
                 }
 
-                if (!hasPortrait && character != null && character.Initial.Length > 0)
-                {
-                    GameObject labelObject = new GameObject(
-                        "Initial",
-                        typeof(RectTransform),
-                        typeof(CanvasRenderer),
-                        typeof(TextMeshProUGUI));
-                    RectTransform labelRect = labelObject.GetComponent<RectTransform>();
-                    labelRect.SetParent(chipRect, false);
-                    labelRect.anchorMin = Vector2.zero;
-                    labelRect.anchorMax = Vector2.one;
-                    labelRect.offsetMin = Vector2.zero;
-                    labelRect.offsetMax = Vector2.zero;
+                label.text = character.Initial;
+                label.fontSize = fontSize;
+                label.fontStyle = FontStyles.Bold;
+                label.alignment = TextAlignmentOptions.Center;
+                label.color = character.PlaceholderColor;
+                ApplyCandidateMarkOutline(label);
+                label.raycastTarget = false;
 
-                    TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
-                    if (coordinateText != null)
-                    {
-                        label.font = coordinateText.font;
-                    }
-
-                    label.text = character.Initial;
-                    label.fontSize = Mathf.Max(9f, chipSize * 0.5f);
-                    label.fontStyle = FontStyles.Bold;
-                    label.alignment = TextAlignmentOptions.Center;
-                    label.color = new Color(1f, 1f, 1f, 0.55f);
-                    label.raycastTarget = false;
-                }
-
-                candidateMarkChips.Add(chip);
-                x += chipSize + 2f;
+                candidateMarkChips.Add(letterObject);
+                visibleIndex++;
             }
+        }
+
+        private static void ApplyCandidateMarkOutline(TextMeshProUGUI label)
+        {
+            if (label == null || label.fontSharedMaterial == null)
+            {
+                return;
+            }
+
+            // fontMaterial 会为该文字创建独立材质实例，避免修改共享字体材质影响其他 UI。
+            Material material = label.fontMaterial;
+            material.SetColor(ShaderUtilities.ID_OutlineColor, Color.black);
+            material.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.25f);
+            label.UpdateMeshPadding();
         }
 
         public void OnPointerDown(PointerEventData eventData)
@@ -805,7 +813,7 @@ namespace Murdoku.Characters
             }
 
             CharacterCardUI sourceCard = eventData.pointerDrag.GetComponentInParent<CharacterCardUI>();
-            TestBoardCellUI sourceCell = eventData.pointerDrag.GetComponentInParent<TestBoardCellUI>();
+            PuzzleBoardCellUI sourceCell = eventData.pointerDrag.GetComponentInParent<PuzzleBoardCellUI>();
             CharacterData droppedCharacter = sourceCard != null
                 ? sourceCard.Character
                 : sourceCell != null ? sourceCell.CurrentCharacter : null;

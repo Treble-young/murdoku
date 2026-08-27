@@ -12,6 +12,8 @@ namespace Murdoku
     /// </summary>
     public static class PuzzleSaveManager
     {
+        private const string BundledPuzzlesFolderName = "Puzzles";
+
         private static string PuzzlesDirectory
         {
             get
@@ -24,6 +26,62 @@ namespace Murdoku
 
                 return Path.Combine(Application.persistentDataPath, "Puzzles");
             }
+        }
+
+        /// <summary>
+        /// 构建版首次读取关卡时，把随安装包发布的预制关卡安装到玩家的可写存档目录。
+        /// 同一游戏版本只执行一次，因此玩家删除或编辑预制关卡后不会在下次启动时被还原。
+        /// </summary>
+        private static void EnsureBundledPuzzlesInstalled()
+        {
+            if (Application.isEditor)
+            {
+                return;
+            }
+
+            string bundledDirectory = Path.Combine(Application.streamingAssetsPath, BundledPuzzlesFolderName);
+            if (!Directory.Exists(bundledDirectory))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(PuzzlesDirectory);
+            string markerName = ".bundled-puzzles-" + SanitizeFileName(Application.version) + ".installed";
+            string markerPath = Path.Combine(PuzzlesDirectory, markerName);
+            if (File.Exists(markerPath))
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (string sourcePath in Directory.GetFiles(bundledDirectory, "*.json"))
+                {
+                    string destinationPath = Path.Combine(PuzzlesDirectory, Path.GetFileName(sourcePath));
+                    if (!File.Exists(destinationPath))
+                    {
+                        File.Copy(sourcePath, destinationPath);
+                    }
+                }
+
+                File.WriteAllText(markerPath, DateTime.UtcNow.ToString("O"));
+            }
+            catch (Exception exception)
+            {
+                // 安装失败时不写 marker，下次读取关卡时会自动重试。
+                Debug.LogError("PuzzleSaveManager failed to install bundled puzzles: " + exception);
+            }
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            string result = string.IsNullOrEmpty(value) ? "unknown" : value;
+            foreach (char invalidCharacter in Path.GetInvalidFileNameChars())
+            {
+                result = result.Replace(invalidCharacter, '_');
+            }
+
+            return result;
         }
 
         public static string GenerateId()
@@ -51,6 +109,8 @@ namespace Murdoku
 
         public static PuzzleData LoadPuzzle(string id)
         {
+            EnsureBundledPuzzlesInstalled();
+
             if (string.IsNullOrEmpty(id))
             {
                 return null;
@@ -75,6 +135,8 @@ namespace Murdoku
 
         public static List<PuzzleData> ListPuzzles()
         {
+            EnsureBundledPuzzlesInstalled();
+
             List<PuzzleData> result = new List<PuzzleData>();
             if (!Directory.Exists(PuzzlesDirectory))
             {
@@ -123,6 +185,8 @@ namespace Murdoku
 
         public static bool DeletePuzzle(string id)
         {
+            EnsureBundledPuzzlesInstalled();
+
             if (string.IsNullOrEmpty(id))
             {
                 return false;
