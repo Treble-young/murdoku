@@ -162,6 +162,7 @@ namespace Murdoku.PuzzleEditor
         {
             if (board != null)
             {
+                board.GridGenerated -= HandleGridGenerated;
                 board.GridGenerated += HandleGridGenerated;
             }
         }
@@ -202,6 +203,7 @@ namespace Murdoku.PuzzleEditor
 
             if (board != null)
             {
+                board.GridGenerated -= HandleGridGenerated;
                 board.GridGenerated += HandleGridGenerated;
             }
 

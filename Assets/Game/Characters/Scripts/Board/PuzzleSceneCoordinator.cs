@@ -85,6 +85,11 @@ namespace Murdoku.Characters
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
         private static readonly Color SuccessColor = new Color(0.45f, 0.80f, 0.50f, 1f);
 
+        private void Awake()
+        {
+            ResolveSceneReferences();
+        }
+
         private void OnEnable()
         {
             if (puzzleBoard != null)
@@ -97,6 +102,8 @@ namespace Murdoku.Characters
 
         private void Start()
         {
+            ResolveSceneReferences();
+
             // 编辑模式（谜题列表点「编辑」）：载入关卡但以出题界面打开，可在此基础上修改。
             bool editMode = PuzzleSession.EditMode;
             playMode = !string.IsNullOrEmpty(PuzzleSession.SelectedPuzzleId) && !editMode;
@@ -108,6 +115,33 @@ namespace Murdoku.Characters
             ApplyModeVisibility();
             ApplyScenePolish();
             StartCoroutine(LoadSelectedPuzzleRoutine());
+        }
+
+        /// <summary>
+        /// 场景脚本重命名、Prefab/Scene 合并或旧场景序列化数据丢失引用时自动恢复依赖。
+        /// 关卡载入不能在棋盘引用为空时继续，否则会出现“墙体和文字已载入、棋盘仍是默认 6×6”的半载入状态。
+        /// </summary>
+        private void ResolveSceneReferences()
+        {
+            if (puzzleBoard == null)
+            {
+                puzzleBoard = FindFirstObjectByType<PuzzleBoardController>();
+            }
+
+            if (placementController == null)
+            {
+                placementController = FindFirstObjectByType<CharacterPlacementController>();
+            }
+
+            if (wallEditController == null)
+            {
+                wallEditController = FindFirstObjectByType<WallEditController>();
+            }
+
+            if (wallEditController != null && puzzleBoard != null)
+            {
+                wallEditController.SetBoard(puzzleBoard);
+            }
         }
 
         private void OnDisable()
@@ -488,6 +522,8 @@ namespace Murdoku.Characters
 
         private IEnumerator LoadSelectedPuzzleRoutine()
         {
+            ResolveSceneReferences();
+
             string puzzleId = PuzzleSession.SelectedPuzzleId;
             PuzzleSession.SelectedPuzzleId = null;
             PuzzleSession.EditMode = false;
@@ -501,6 +537,12 @@ namespace Murdoku.Characters
             if (data == null || data.size < PuzzleBoardController.MinSize || data.size > PuzzleBoardController.MaxSize)
             {
                 SetStatus("未找到关卡存档，已进入空白棋盘。");
+                yield break;
+            }
+
+            if (puzzleBoard == null)
+            {
+                SetStatus("关卡载入失败：场景中没有找到棋盘控制器。");
                 yield break;
             }
 
@@ -525,14 +567,44 @@ namespace Murdoku.Characters
             yield return null;
             yield return null;
 
-            if (puzzleBoard != null)
-            {
-                puzzleBoard.SetGridSize(data.size, data.size);
-            }
+            puzzleBoard.SetGridSize(data.size, data.size);
 
             // 等待新尺寸的棋盘布局与墙体边框重建完成。
             yield return null;
             yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            int expectedCellCount = data.size * data.size;
+            if (puzzleBoard.Rows != data.size ||
+                puzzleBoard.Columns != data.size ||
+                puzzleBoard.Cells.Count != expectedCellCount)
+            {
+                // 某些旧场景会在载入协程之后再次生成默认 6×6 棋盘；检测到后强制重建一次。
+                puzzleBoard.SetGridSize(data.size, data.size);
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+            }
+
+            if (puzzleBoard.Rows != data.size ||
+                puzzleBoard.Columns != data.size ||
+                puzzleBoard.Cells.Count != expectedCellCount)
+            {
+                SetStatus(
+                    "关卡载入失败：目标棋盘为 " + data.size + "×" + data.size +
+                    "，实际只生成了 " + puzzleBoard.Rows + "×" + puzzleBoard.Columns +
+                    "（" + puzzleBoard.Cells.Count + " 格）。");
+                yield break;
+            }
+
+            CharacterPanelUI characterPanel = placementController == null
+                ? null
+                : placementController.SelectionSource;
+            if (characterPanel != null && characterPanel.Characters.Count != data.size)
+            {
+                // N×N 棋盘必须生成 N-1 名嫌疑人 + 1 名受害者。
+                characterPanel.RebuildSuspects(data.size);
+            }
 
             if (wallEditController != null)
             {
@@ -551,13 +623,13 @@ namespace Murdoku.Characters
             }
 
             // 恢复格子地块（出题时铺的地块图案）。
-            RestoreFloorTiles(data);
-            RestoreProps(data);
+            int restoredFloorCount = RestoreFloorTiles(data);
+            int restoredPropCount = RestoreProps(data);
             RestoreForbiddenCells(data);
 
-            if (placementController != null && placementController.SelectionSource != null)
+            if (characterPanel != null)
             {
-                placementController.SelectionSource.ApplyClues(data.clues);
+                characterPanel.ApplyClues(data.clues);
             }
 
             solutionPlacements = data.placements;
@@ -570,21 +642,25 @@ namespace Murdoku.Characters
             redoActions.Clear();
 
             RefreshHighlights();
-            SetStatus("已载入关卡：" + data.name + "，点击格子标记候选，长按或拖拽人物卡放置，摆完提交。");
+            SetStatus(
+                "已载入关卡：" + data.name + "（" + data.size + "×" + data.size +
+                "，" + restoredFloorCount + " 格地块，" + restoredPropCount +
+                " 件道具），点击格子标记候选，长按或拖拽人物卡放置，摆完提交。");
         }
 
         /// <summary>
         /// 把存档中的格子地块恢复显示到棋盘（-1 = 无地块）。
         /// </summary>
-        private void RestoreFloorTiles(PuzzleData data)
+        private int RestoreFloorTiles(PuzzleData data)
         {
             if (puzzleBoard == null || data.floorTiles == null || data.floorTiles.Length == 0)
             {
-                return;
+                return 0;
             }
 
             RegionStyleFactory.EnsureSprites();
             RegionDefinition[] definitions = RegionStyleFactory.All;
+            int restoredCount = 0;
 
             for (int index = 0; index < puzzleBoard.Cells.Count && index < data.floorTiles.Length; index++)
             {
@@ -595,21 +671,25 @@ namespace Murdoku.Characters
                 }
 
                 puzzleBoard.Cells[index].SetFloorTile(tileIndex, definitions[tileIndex].Sprite);
+                restoredCount++;
             }
+
+            return restoredCount;
         }
 
         /// <summary>
         /// 把存档中的格子道具恢复显示到棋盘（-1 = 无道具；旧存档无字段自动跳过）。
         /// </summary>
-        private void RestoreProps(PuzzleData data)
+        private int RestoreProps(PuzzleData data)
         {
             if (puzzleBoard == null || data.props == null || data.props.Length == 0)
             {
-                return;
+                return 0;
             }
 
             PropStyleFactory.EnsureSprites();
             PropDefinition[] definitions = PropStyleFactory.All;
+            int restoredCount = 0;
 
             for (int index = 0; index < puzzleBoard.Cells.Count && index < data.props.Length; index++)
             {
@@ -620,7 +700,10 @@ namespace Murdoku.Characters
                 }
 
                 puzzleBoard.Cells[index].SetProp(propIndex, definitions[propIndex].Sprite);
+                restoredCount++;
             }
+
+            return restoredCount;
         }
 
         /// <summary>
