@@ -62,6 +62,10 @@ namespace Murdoku.Characters
         private static readonly string[] DifficultyNames = { "教程", "简单", "中等", "困难", "噩梦" };
         private List<PuzzlePlacementData> solutionPlacements;
 
+        private GameObject tutorialPanelRoot;
+        private Button tutorialButton;
+        private static bool tutorialAutoShownThisSession;
+
         private sealed class GameAction
         {
             public bool IsPlacement;
@@ -556,6 +560,13 @@ namespace Murdoku.Characters
             selectedDifficulty = Mathf.Clamp(data.difficulty, 0, DifficultyNames.Length - 1);
             RefreshDifficultyButtons();
 
+            // 新手教程关卡（难度=教程）首次进入时自动弹出教学卡片；之后可通过右上角 "?" 随时重看。
+            if (playMode && data.difficulty == 0 && !tutorialAutoShownThisSession)
+            {
+                tutorialAutoShownThisSession = true;
+                ShowTutorial();
+            }
+
             // 恢复全局线索并显示在嫌疑人卡片下方（旧存档无此字段则不显示）。
             selectedGlobalClue = data.globalClue ?? string.Empty;
             if (placementController != null && placementController.SelectionSource != null)
@@ -730,6 +741,149 @@ namespace Murdoku.Characters
         private void ShowErrorPopup(string title, string message)
         {
             ShowPopup(title, message);
+        }
+
+        private void ShowTutorial()
+        {
+            EnsureTutorialButton();
+            if (tutorialPanelRoot == null)
+            {
+                BuildTutorialPanel();
+            }
+
+            if (tutorialPanelRoot == null)
+            {
+                return;
+            }
+
+            tutorialPanelRoot.SetActive(true);
+        }
+
+        private void CloseTutorial()
+        {
+            if (tutorialPanelRoot != null)
+            {
+                tutorialPanelRoot.SetActive(false);
+            }
+        }
+
+        private void ToggleTutorial()
+        {
+            if (tutorialPanelRoot != null && tutorialPanelRoot.activeSelf)
+            {
+                CloseTutorial();
+            }
+            else
+            {
+                ShowTutorial();
+            }
+        }
+
+        /// <summary>
+        /// 右上角小 "?" 按钮：游玩模式常驻，忘记玩法时可随时重新打开教程卡片。
+        /// </summary>
+        private void EnsureTutorialButton()
+        {
+            if (tutorialButton != null)
+            {
+                return;
+            }
+
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                return;
+            }
+
+            RectTransform rect = CreateUiObject("TutorialButton", canvas.transform).GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-24f, -62f);
+            rect.sizeDelta = new Vector2(88f, 88f);
+
+            Image image = rect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(image, 44);
+            image.color = new Color(0.22f, 0.48f, 0.86f, 1f);
+
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(ToggleTutorial);
+            UiClickFeedback.Ensure(button);
+
+            TMP_Text label = CreateText("Label", rect, GetUiFont(), 36f, FontStyles.Bold);
+            label.text = "说明";
+            Stretch(label.rectTransform);
+            label.raycastTarget = false;
+            tutorialButton = button;
+        }
+
+        /// <summary>
+        /// 右上角边缘的新手教程卡片：简要说明标记/放置/行列规则/全局线索/区域与提交。
+        /// </summary>
+        private void BuildTutorialPanel()
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            TMP_FontAsset font = GetUiFont();
+            if (canvas == null || font == null)
+            {
+                return;
+            }
+
+            RectTransform panel = CreateUiObject("TutorialPanel", canvas.transform).GetComponent<RectTransform>();
+            tutorialPanelRoot = panel.gameObject;
+            panel.anchorMin = new Vector2(1f, 1f);
+            panel.anchorMax = new Vector2(1f, 1f);
+            panel.pivot = new Vector2(1f, 1f);
+            panel.anchoredPosition = new Vector2(-24f, -160f);
+            panel.sizeDelta = new Vector2(560f, 700f);
+
+            Image panelImage = panel.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(panelImage, 16);
+            panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.98f);
+
+            TMP_Text title = CreateText("TitleText", panel, font, 48f, FontStyles.Bold);
+            title.text = "新手教程";
+            RectTransform titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.sizeDelta = new Vector2(0f, 72f);
+            titleRect.anchoredPosition = new Vector2(0f, -16f);
+
+            TMP_Text body = CreateText("BodyText", panel, font, 36f, FontStyles.Normal);
+            body.text = "· 单击格子 = 标记候选（先选中人物卡）\n"
+                + "· 位置多时先靠线索缩小范围再标\n"
+                + "· 长按格子或拖拽人物卡 = 放置\n"
+                + "· 每行每列只能有一个人物\n"
+                + "· 全局线索整局有效\n"
+                + "· 区域 = 墙围出的一块格子；凶手 = 与受害者同区域且仅两人\n"
+                + "· 摆满后点「提交」判定通关";
+            body.alignment = TextAlignmentOptions.TopLeft;
+            body.color = new Color(0.90f, 0.93f, 0.97f, 1f);
+            RectTransform bodyRect = body.rectTransform;
+            bodyRect.anchorMin = new Vector2(0f, 0f);
+            bodyRect.anchorMax = new Vector2(1f, 1f);
+            bodyRect.offsetMin = new Vector2(24f, 96f);
+            bodyRect.offsetMax = new Vector2(-24f, -96f);
+
+            RectTransform okRect = CreateUiObject("OkButton", panel).GetComponent<RectTransform>();
+            okRect.anchorMin = new Vector2(0.5f, 0f);
+            okRect.anchorMax = new Vector2(0.5f, 0f);
+            okRect.pivot = new Vector2(0.5f, 0.5f);
+            okRect.sizeDelta = new Vector2(220f, 76f);
+            okRect.anchoredPosition = new Vector2(0f, 18f);
+            Image okImage = okRect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(okImage, 12);
+            okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
+            Button okButton = okRect.gameObject.AddComponent<Button>();
+            okButton.targetGraphic = okImage;
+            okButton.onClick.AddListener(CloseTutorial);
+            UiClickFeedback.Ensure(okButton);
+            TMP_Text okLabel = CreateText("Label", okRect, font, 40f, FontStyles.Bold);
+            okLabel.text = "我知道了";
+            Stretch(okLabel.rectTransform);
+            okLabel.raycastTarget = false;
         }
 
         private void ShowPopup(string title, string message)
@@ -2250,6 +2404,12 @@ namespace Murdoku.Characters
             if (redoButton != null)
             {
                 redoButton.gameObject.SetActive(playMode);
+            }
+
+            EnsureTutorialButton();
+            if (tutorialButton != null)
+            {
+                tutorialButton.gameObject.SetActive(playMode);
             }
 
             // 游玩模式禁用嫌疑人卡的性别切换（出题模式可编辑性别）。
