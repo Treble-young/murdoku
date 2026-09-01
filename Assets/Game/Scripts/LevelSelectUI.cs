@@ -15,7 +15,8 @@ namespace Murdoku
     {
         private const int PageSize = 12;
         private const int TabCount = 6;
-        private static readonly string[] TabNames = { "全部", "教程", "简单", "中等", "困难", "噩梦" };
+        private static readonly string[] TabNames = { "教程", "简单", "中等", "困难", "噩梦", "全部" };
+        private static readonly int[] TabDifficulties = { 0, 1, 2, 3, 4, -1 };
 
         [SerializeField] private RectTransform gridRoot;
         [SerializeField] private GameObject itemTemplate;
@@ -30,7 +31,7 @@ namespace Murdoku
         private readonly List<TMP_Text> tabLabels = new List<TMP_Text>();
         private List<PuzzleData> puzzles = new List<PuzzleData>();
         private int currentPage;
-        private int selectedTab = -1; // -1=全部，0~4=教程~噩梦
+        private int selectedTab = 0; // 初始显示教程；-1=全部，0~4=教程~噩梦
 
         private void Awake()
         {
@@ -389,7 +390,12 @@ namespace Murdoku
 
         private void HandleTabClicked(int index)
         {
-            selectedTab = index - 1; // 0=全部 → -1
+            if (index < 0 || index >= TabDifficulties.Length)
+            {
+                return;
+            }
+
+            selectedTab = TabDifficulties[index];
             RefreshDifficultyTabs();
             RefreshList(0);
         }
@@ -400,7 +406,7 @@ namespace Murdoku
             Color normalColor = new Color(0.93f, 0.94f, 0.96f, 1f);
             for (int index = 0; index < tabImages.Count; index++)
             {
-                bool selected = index - 1 == selectedTab;
+                bool selected = index < TabDifficulties.Length && TabDifficulties[index] == selectedTab;
                 if (tabImages[index] != null)
                 {
                     tabImages[index].color = selected ? selectedColor : normalColor;
@@ -618,7 +624,7 @@ namespace Murdoku
 
         public void BackToMenu()
         {
-            SceneManager.LoadScene("SampleScene");
+            SceneManager.LoadScene("MainMenuScene");
         }
     }
 }

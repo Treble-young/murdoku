@@ -836,7 +836,7 @@ namespace Murdoku.Characters
             panel.anchorMax = new Vector2(1f, 1f);
             panel.pivot = new Vector2(1f, 1f);
             panel.anchoredPosition = new Vector2(-24f, -160f);
-            panel.sizeDelta = new Vector2(560f, 700f);
+            panel.sizeDelta = new Vector2(560f, 820f);
 
             Image panelImage = panel.gameObject.AddComponent<Image>();
             UiRoundedSprite.Apply(panelImage, 16);
@@ -852,15 +852,15 @@ namespace Murdoku.Characters
             titleRect.anchoredPosition = new Vector2(0f, -16f);
 
             TMP_Text body = CreateText("BodyText", panel, font, 36f, FontStyles.Normal);
-            body.text = "· 单击格子 = 标记候选（先选中人物卡）\n"
-                + "· 位置多时先靠线索缩小范围再标\n"
-                + "· 长按格子或拖拽人物卡 = 放置\n"
-                + "· 每行每列只能有一个人物\n"
-                + "· 全局线索整局有效\n"
-                + "· 区域 = 墙围出的一块格子；凶手 = 与受害者同区域且仅两人\n"
-                + "· 摆满后点「提交」判定通关";
+            body.text = "<b>1  阅读线索</b>：人物卡三的是个人线索；全局线索对所有人有效。\n"
+                + "<b>2  标记候选</b>：选中人物后单击格子；再次单击即可取消。\n"
+                + "<b>3  放置人物</b>：长按格子，或把人物卡拖到格子三。\n"
+                + "<b>每一行、每一列都只能放置一个人。</b>\n"
+                + "<b>4  找出凶手</b>：与受害者单独同处一个区域的人就是凶手。\n"
+                + "摆放所有人物后，点击「提交」检查答案。";
             body.alignment = TextAlignmentOptions.TopLeft;
             body.color = new Color(0.90f, 0.93f, 0.97f, 1f);
+            body.lineSpacing = 0f;
             RectTransform bodyRect = body.rectTransform;
             bodyRect.anchorMin = new Vector2(0f, 0f);
             bodyRect.anchorMax = new Vector2(1f, 1f);

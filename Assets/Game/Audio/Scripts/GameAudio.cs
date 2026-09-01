@@ -29,7 +29,7 @@ namespace Murdoku.Audio
         private const string CaseSolvedResourcePath = "Audio/SFX/case_solved";
         private const string MainMusicResourcePath = "Audio/Music/murdoku_light_mystery";
         private const string InvestigationMusicResourcePath = "Audio/Music/investigation_strings_choir";
-        private const string MainMenuSceneName = "SampleScene";
+        private const string MainMenuSceneName = "MainMenuScene";
         private const string LevelSelectSceneName = "LevelSelectScene";
 
         private static GameAudio instance;

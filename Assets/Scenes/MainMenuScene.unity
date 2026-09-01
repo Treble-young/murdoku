@@ -150,6 +150,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuManager
   instructionPanel: {fileID: 1535842347}
   maskBlack: {fileID: 1147783918}
+  feedbackFont: {fileID: 11400000, guid: ef6913b45a70806458f6e0128eef9e02, type: 2}
 --- !u!4 &120034283
 Transform:
   m_ObjectHideFlags: 0
