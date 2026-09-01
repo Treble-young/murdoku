@@ -240,7 +240,7 @@ namespace Murdoku.Characters.Editor
             CharacterPanelUI panelUI = FindSingleSceneComponent<CharacterPanelUI>(scene);
             CharacterPlacementController placement = FindSingleSceneComponent<CharacterPlacementController>(scene);
             PuzzleBoardController board = FindSingleSceneComponent<PuzzleBoardController>(scene);
-            FindSingleSceneComponent<PuzzleSceneCoordinator>(scene);
+            PuzzleSceneCoordinator coordinator = FindSingleSceneComponent<PuzzleSceneCoordinator>(scene);
 
             Require(panelView.CharacterGrid != null, "CharacterPanelView.CharacterGrid is not assigned.");
             SerializedObject panelSerialized = new SerializedObject(panelUI);
@@ -312,6 +312,9 @@ namespace Murdoku.Characters.Editor
             {
                 ValidateNoMissingScripts(rootObject);
             }
+
+            ValidatePuzzleBackTargets();
+            ValidatePopupConfirmation(coordinator);
 
             panelUI.Rebuild();
             CharacterCardUI[] cards = panelView.CharacterGrid.GetComponentsInChildren<CharacterCardUI>(true);
@@ -414,7 +417,7 @@ namespace Murdoku.Characters.Editor
                 ValidateGeneratedLayout(panelUI, panelView, board, 6);
                 ValidateGeneratedLayout(panelUI, panelView, board, 10);
 
-                Debug.Log("PuzzleScene validation passed: portrait uniqueness/gender matching, hierarchy, X ordering, duplicate cleanup, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
+                Debug.Log("PuzzleScene validation passed: navigation targets, one-shot popup confirmation, portrait uniqueness/gender matching, hierarchy, X ordering, duplicate cleanup, selection toggle, placement dimming, movement, undo/redo, occupancy, and row/column rule checks succeeded.");
             }
             finally
             {
@@ -432,6 +435,74 @@ namespace Murdoku.Characters.Editor
             Require(
                 !activeSceneAfter.IsValid() || activeSceneAfter.isDirty == activeSceneDirtyBefore,
                 "Validation must not change the active scene dirty state.");
+        }
+
+        private static void ValidatePuzzleBackTargets()
+        {
+            MethodInfo resolver = typeof(SceneSwitch).GetMethod(
+                "ResolveBackTargetScene",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Require(resolver != null, "SceneSwitch back-target resolver was not found.");
+
+            string createTarget = resolver.Invoke(null, new object[] { null, false }) as string;
+            string editTarget = resolver.Invoke(null, new object[] { "existing-puzzle", true }) as string;
+            string playTarget = resolver.Invoke(null, new object[] { "selected-puzzle", false }) as string;
+
+            Require(createTarget == "MainMenuScene", "Creating a puzzle must return to MainMenuScene.");
+            Require(editTarget == "MainMenuScene", "Editing a puzzle must return to MainMenuScene.");
+            Require(playTarget == "LevelSelectScene", "Playing a puzzle must return to LevelSelectScene.");
+        }
+
+        private static void ValidatePopupConfirmation(PuzzleSceneCoordinator coordinator)
+        {
+            MethodInfo confirmPopup = typeof(PuzzleSceneCoordinator).GetMethod(
+                "ConfirmPopup",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Require(confirmPopup != null, "PuzzleSceneCoordinator.ConfirmPopup was not found.");
+
+            FieldInfo popupRootField = typeof(PuzzleSceneCoordinator).GetField(
+                "popupRoot",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Require(popupRootField != null, "PuzzleSceneCoordinator popup root field was not found.");
+
+            FieldInfo confirmActionField = typeof(PuzzleSceneCoordinator).GetField(
+                "popupConfirmAction",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Require(confirmActionField != null, "PuzzleSceneCoordinator popup confirmation field was not found.");
+
+            GameObject popupRoot = new GameObject("PopupValidationRoot");
+            SceneManager.MoveGameObjectToScene(popupRoot, coordinator.gameObject.scene);
+            popupRootField.SetValue(coordinator, popupRoot);
+
+            try
+            {
+                int confirmationCount = 0;
+                bool popupWasHiddenBeforeAction = false;
+                Action confirmation = () =>
+                {
+                    popupWasHiddenBeforeAction = !popupRoot.activeSelf;
+                    confirmationCount++;
+                };
+                confirmActionField.SetValue(coordinator, confirmation);
+
+                confirmPopup.Invoke(coordinator, null);
+                confirmPopup.Invoke(coordinator, null);
+                Require(confirmationCount == 1, "A popup confirmation action must run exactly once.");
+                Require(popupWasHiddenBeforeAction, "The popup must close before its confirmation action runs.");
+                Require(!popupRoot.activeSelf, "The popup must remain closed after confirmation.");
+
+                popupRoot.SetActive(true);
+                confirmActionField.SetValue(coordinator, null);
+                confirmPopup.Invoke(coordinator, null);
+                Require(confirmationCount == 1, "A popup without a confirmation action must only close.");
+                Require(!popupRoot.activeSelf, "A popup without a confirmation action must close normally.");
+            }
+            finally
+            {
+                popupRootField.SetValue(coordinator, null);
+                confirmActionField.SetValue(coordinator, null);
+                UnityEngine.Object.DestroyImmediate(popupRoot);
+            }
         }
 
         private static void ValidateGeneratedLayout(

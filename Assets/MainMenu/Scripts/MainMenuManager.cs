@@ -232,6 +232,7 @@ public class MainMenuManager : MonoBehaviour
     public void OnCreatePuzzle()
     {
         Murdoku.PuzzleSession.SelectedPuzzleId = null;
+        Murdoku.PuzzleSession.EditMode = false;
         SceneManager.LoadScene("PuzzleScene");
     }
 

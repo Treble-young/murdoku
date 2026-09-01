@@ -5,6 +5,7 @@ using Murdoku.Audio;
 using Murdoku.PuzzleEditor;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Murdoku.Characters
@@ -33,6 +34,7 @@ namespace Murdoku.Characters
         private GameObject popupRoot;
         private TMP_Text popupTitleText;
         private TMP_Text popupMessageText;
+        private Action popupConfirmAction;
         private TMP_Text statusText;
         private Button clueButton;
         private Button submitButton;
@@ -150,6 +152,8 @@ namespace Murdoku.Characters
 
         private void OnDisable()
         {
+            popupConfirmAction = null;
+
             if (puzzleBoard != null)
             {
                 puzzleBoard.CellClicked -= HandleCellClicked;
@@ -886,7 +890,7 @@ namespace Murdoku.Characters
             okLabel.raycastTarget = false;
         }
 
-        private void ShowPopup(string title, string message)
+        private void ShowPopup(string title, string message, Action onConfirmed = null)
         {
             if (popupRoot == null)
             {
@@ -895,10 +899,12 @@ namespace Murdoku.Characters
 
             if (popupRoot == null)
             {
+                popupConfirmAction = null;
                 SetSaveHint("无法显示弹窗，请检查场景 Canvas 配置。", true);
                 return;
             }
 
+            popupConfirmAction = onConfirmed;
             popupRoot.SetActive(true);
             if (popupTitleText != null)
             {
@@ -966,7 +972,7 @@ namespace Murdoku.Characters
             okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
             Button okButton = okRect.gameObject.AddComponent<Button>();
             okButton.targetGraphic = okImage;
-            okButton.onClick.AddListener(CloseErrorPopup);
+            okButton.onClick.AddListener(ConfirmPopup);
             UiClickFeedback.Ensure(okButton);
 
             TMP_Text okLabel = CreateText("Label", okRect, font, 32f, FontStyles.Normal);
@@ -1002,12 +1008,23 @@ namespace Murdoku.Characters
             rect.offsetMax = Vector2.zero;
         }
 
-        private void CloseErrorPopup()
+        private void ConfirmPopup()
         {
             if (popupRoot != null)
             {
                 popupRoot.SetActive(false);
             }
+
+            Action confirmAction = popupConfirmAction;
+            popupConfirmAction = null;
+            confirmAction?.Invoke();
+        }
+
+        private static void ReturnToLevelSelect()
+        {
+            PuzzleSession.SelectedPuzzleId = null;
+            PuzzleSession.EditMode = false;
+            SceneManager.LoadScene("LevelSelectScene");
         }
 
         private void RefreshHighlights()
@@ -2219,7 +2236,10 @@ namespace Murdoku.Characters
             if (roomMates.Count == 1)
             {
                 GameAudio.Play(SfxCue.CaseSolved);
-                ShowPopup("破案成功！", "凶手是 " + roomMates[0].DisplayName + "：TA 与受害者同处一室且身边没有其他人。");
+                ShowPopup(
+                    "破案成功！",
+                    "凶手是 " + roomMates[0].DisplayName + "：TA 与受害者同处一室且身边没有其他人。",
+                    ReturnToLevelSelect);
                 SetStatus("破案成功！凶手是 " + roomMates[0].DisplayName + "。", false);
                 return;
             }

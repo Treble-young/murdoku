@@ -305,47 +305,47 @@
     "clues": [
         {
             "characterId": "A",
-            "clue": "我在松林中，左右两边各有一棵松树。",
+            "clue": "我在松林，左右两格都是松树。",
             "name": "Amy",
             "gender": 2
         },
         {
             "characterId": "B",
-            "clue": "我在湖岸，并且与救生圈三下左右相邻。",
+            "clue": "我在湖岸，与救生圈相邻。",
             "name": "Ben",
             "gender": 1
         },
         {
             "characterId": "C",
-            "clue": "我在帐篷区，并且与帐篷三下左右相邻。",
+            "clue": "我在帐篷区，与帐篷相邻。",
             "name": "Cathy",
             "gender": 2
         },
         {
             "characterId": "D",
-            "clue": "我在受害者的左下方，比她低一行、向左两列。",
+            "clue": "我在受害者左下方：低一行、左两列。",
             "name": "Dave",
             "gender": 1
         },
         {
             "characterId": "E",
-            "clue": "我在 Ben 的西北方向；我们相隔两行、两列。",
+            "clue": "我在Ben西北方，中间隔一行、一列。",
             "name": "Emma",
             "gender": 2
         },
         {
             "characterId": "F",
-            "clue": "我在篝火空地，并且与篝火三下左右相邻。",
+            "clue": "我在篝火空地，与篝火相邻。",
             "name": "Felix",
             "gender": 1
         },
         {
             "characterId": "V",
-            "clue": "受害者倒在管理小屋内，并且与书架相邻。",
+            "clue": "我在管理小屋，与书架相邻。",
             "name": "Victim",
             "gender": 2
         }
     ],
     "difficulty": 2,
-    "globalClue": "道具所在格不能站人。凶手是唯一与受害者同处一个区域的嫌疑人。"
+    "globalClue": "相邻只算共边；道具格不能站人。唯一与受害者同区域的嫌疑人是凶手。"
 }

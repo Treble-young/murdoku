@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -31,6 +32,8 @@ namespace Murdoku.Audio
         private const string InvestigationMusicResourcePath = "Audio/Music/investigation_strings_choir";
         private const string MainMenuSceneName = "MainMenuScene";
         private const string LevelSelectSceneName = "LevelSelectScene";
+        private const float MusicVolume = 0.3f;
+        private const float MusicFadeDuration = 0.75f;
 
         private static GameAudio instance;
 
@@ -38,6 +41,7 @@ namespace Murdoku.Audio
         private readonly Dictionary<MusicCue, AudioClip> musicClips = new Dictionary<MusicCue, AudioClip>();
         private AudioSource sfxSource;
         private AudioSource musicSource;
+        private Coroutine musicTransitionCoroutine;
         private MusicCue? currentMusicCue;
         private bool initialized;
 
@@ -124,7 +128,7 @@ namespace Murdoku.Audio
             ConfigureSource(sfxSource, 0.8f);
 
             musicSource = gameObject.AddComponent<AudioSource>();
-            ConfigureSource(musicSource, 0.3f);
+            ConfigureSource(musicSource, MusicVolume);
             musicSource.loop = true;
 
             sfxClips[SfxCue.UiClick] = LoadClip(ClickResourcePath, "UI click");
@@ -137,7 +141,7 @@ namespace Murdoku.Audio
                 "investigation background music");
 
             initialized = true;
-            SetMusicInternal(MusicCue.Main);
+            SetMusicImmediate(MusicCue.Main);
         }
 
         private static void ConfigureSource(AudioSource source, float volume)
@@ -179,10 +183,50 @@ namespace Murdoku.Audio
                 return;
             }
 
-            if (currentMusicCue != cue || musicSource.clip != clip)
+            if (currentMusicCue == cue &&
+                musicSource.clip == clip &&
+                musicSource.isPlaying &&
+                musicTransitionCoroutine == null &&
+                Mathf.Approximately(musicSource.volume, MusicVolume))
+            {
+                return;
+            }
+
+            if (musicTransitionCoroutine != null)
+            {
+                StopCoroutine(musicTransitionCoroutine);
+            }
+
+            musicTransitionCoroutine = StartCoroutine(TransitionMusicRoutine(cue, clip));
+        }
+
+        private void SetMusicImmediate(MusicCue cue)
+        {
+            if (musicSource == null || !musicClips.TryGetValue(cue, out AudioClip clip) || clip == null)
+            {
+                return;
+            }
+
+            musicSource.Stop();
+            musicSource.clip = clip;
+            musicSource.volume = MusicVolume;
+            currentMusicCue = cue;
+            musicSource.Play();
+        }
+
+        private IEnumerator TransitionMusicRoutine(MusicCue cue, AudioClip clip)
+        {
+            bool needsClipChange = currentMusicCue != cue || musicSource.clip != clip;
+            if (needsClipChange && musicSource.isPlaying)
+            {
+                yield return FadeMusicVolume(musicSource.volume, 0f);
+            }
+
+            if (needsClipChange)
             {
                 musicSource.Stop();
                 musicSource.clip = clip;
+                musicSource.volume = 0f;
                 currentMusicCue = cue;
             }
 
@@ -190,6 +234,23 @@ namespace Murdoku.Audio
             {
                 musicSource.Play();
             }
+
+            yield return FadeMusicVolume(musicSource.volume, MusicVolume);
+            musicTransitionCoroutine = null;
+        }
+
+        private IEnumerator FadeMusicVolume(float startVolume, float targetVolume)
+        {
+            float elapsed = 0f;
+            while (elapsed < MusicFadeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / MusicFadeDuration);
+                musicSource.volume = Mathf.Lerp(startVolume, targetVolume, progress);
+                yield return null;
+            }
+
+            musicSource.volume = targetVolume;
         }
 
         private void HandleSceneLoaded(Scene scene, LoadSceneMode loadMode)
