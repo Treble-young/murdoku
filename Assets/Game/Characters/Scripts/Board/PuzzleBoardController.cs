@@ -70,6 +70,9 @@ namespace Murdoku.Characters
                 return disabled;
             }
 
+            // 人物可能是从别处移动过来的：先移除它在旧行列留下的自动来源。
+            ClearRowColumnCells(placed);
+
             int row = atCell.GridPosition.y;
             int column = atCell.GridPosition.x;
             foreach (PuzzleBoardCellUI cell in cells)
@@ -82,15 +85,31 @@ namespace Murdoku.Characters
                 Vector2Int pos = cell.GridPosition;
                 if (pos.y == row || pos.x == column)
                 {
-                    if (!cell.IsForbidden)
+                    if (cell.SetAutomaticPlayerMark(placed, true))
                     {
-                        cell.SetPlayerMark(true);
                         disabled.Add(cell);
                     }
                 }
             }
 
             return disabled;
+        }
+
+        /// <summary>只移除指定人物产生的行列自动禁放来源，保留玩家手动叉号和其他人物来源。</summary>
+        public void ClearRowColumnCells(CharacterData placed)
+        {
+            if (placed == null)
+            {
+                return;
+            }
+
+            foreach (PuzzleBoardCellUI cell in cells)
+            {
+                if (cell != null)
+                {
+                    cell.SetAutomaticPlayerMark(placed, false);
+                }
+            }
         }
 
         /// <summary>

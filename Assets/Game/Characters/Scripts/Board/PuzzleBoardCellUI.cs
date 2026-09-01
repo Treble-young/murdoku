@@ -54,7 +54,9 @@ namespace Murdoku.Characters
         private Image regionOverlay;
         private Image propImage;
         private bool editorForbidden;
+        // 玩家主动打的叉与人物行列自动产生的叉分开保存，避免移动人物时误删手动标记。
         private bool playerMarked;
+        private readonly HashSet<CharacterData> automaticMarkSources = new HashSet<CharacterData>();
         private TMP_Text forbiddenMark;
         private readonly List<CharacterData> candidateMarks = new List<CharacterData>();
         private readonly List<GameObject> candidateMarkChips = new List<GameObject>();
@@ -80,7 +82,7 @@ namespace Murdoku.Characters
         }
 
         /// <summary>是否禁止放置人物（出题人禁放规则 + 游玩玩家标记任一为真）。</summary>
-        public bool IsForbidden => editorForbidden || playerMarked;
+        public bool IsForbidden => editorForbidden || playerMarked || automaticMarkSources.Count > 0;
 
         /// <summary>出题人禁放状态（保存进关卡；游玩模式隐形生效）。</summary>
         public bool EditorForbidden => editorForbidden;
@@ -115,6 +117,7 @@ namespace Murdoku.Characters
             propIndex = -1;
             editorForbidden = false;
             playerMarked = false;
+            automaticMarkSources.Clear();
             candidateMarks.Clear();
             RebuildCandidateMarkVisual();
             Refresh();
@@ -575,6 +578,28 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
+        /// 添加或移除某个人物造成的行列自动禁放来源。
+        /// 返回该来源是否确实发生变化；手动叉号不受影响。
+        /// </summary>
+        public bool SetAutomaticPlayerMark(CharacterData source, bool marked)
+        {
+            if (source == null)
+            {
+                return false;
+            }
+
+            bool changed = marked
+                ? automaticMarkSources.Add(source)
+                : automaticMarkSources.Remove(source);
+            if (changed)
+            {
+                RefreshForbiddenMark();
+            }
+
+            return changed;
+        }
+
+        /// <summary>
         /// 移除该格上除 keep 外的所有候选标记，返回被移除的角色列表（供撤销时恢复）。
         /// </summary>
         public List<CharacterData> RemoveCandidateMarksExcept(CharacterData keep)
@@ -607,7 +632,7 @@ namespace Murdoku.Characters
 
         private void RefreshForbiddenMark()
         {
-            bool show = playerMarked || (editorForbidden && editorMarkVisible);
+            bool show = playerMarked || automaticMarkSources.Count > 0 || (editorForbidden && editorMarkVisible);
             if (show)
             {
                 EnsureForbiddenMark();

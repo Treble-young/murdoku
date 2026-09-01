@@ -2003,15 +2003,20 @@ namespace Murdoku.Characters
                     }
                 }
 
-                // 清除放置时打上的行列禁用标记（黑叉）。
-                if (action.DisabledCells != null)
+                // 只清除该人物在撤销前位置产生的自动叉号；手动叉号和其他人物来源保持不变。
+                if (action.MarkCharacter != null && puzzleBoard != null)
                 {
-                    foreach (PuzzleBoardCellUI disabledCell in action.DisabledCells)
+                    puzzleBoard.ClearRowColumnCells(action.MarkCharacter);
+
+                    // 撤销“移动”后人物回到旧位置，需要为旧行列重新生成自动叉号；
+                    // 撤销“首次放置”后人物回到面板，此时没有位置，不再生成。
+                    if (placementController.TryGetPlacement(
+                            action.MarkCharacter,
+                            out ICharacterPlacementCell restoredCell))
                     {
-                        if (disabledCell != null)
-                        {
-                            disabledCell.SetPlayerMark(false);
-                        }
+                        action.DisabledCells = puzzleBoard.DisableRowColumnCells(
+                            action.MarkCharacter,
+                            restoredCell);
                     }
                 }
 
