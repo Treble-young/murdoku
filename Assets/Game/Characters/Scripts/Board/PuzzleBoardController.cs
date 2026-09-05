@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,9 +28,15 @@ namespace Murdoku.Characters
         [SerializeField] private float minCellSize = 40f;
 
         private readonly List<PuzzleBoardCellUI> cells = new List<PuzzleBoardCellUI>();
+        private const float CoordinateGap = 30f;
+        private const float CoordinateLabelSize = 46f;
+        private RectTransform coordinateOverlay;
+        private readonly List<GameObject> coordinateLabels = new List<GameObject>();
+        private TMP_FontAsset coordinateFont;
 
         public event Action<ICharacterPlacementCell> CellClicked;
         public event Action<ICharacterPlacementCell> CellLongPressed;
+        public event Action<ICharacterPlacementCell> CellRightClicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
         /// <summary>棋盘重建完成后触发，参数为 (行数, 列数)。</summary>
@@ -209,12 +216,143 @@ namespace Murdoku.Characters
                     cell.Configure(position, !blocked.Contains(position));
                     cell.Clicked += HandleCellClicked;
                     cell.LongPressed += HandleCellLongPressed;
+                    cell.RightClicked += HandleCellRightClicked;
                     cell.CharacterDropped += HandleCharacterDropped;
                     cells.Add(cell);
                 }
             }
 
+            RefreshCoordinateLabels();
             GridGenerated?.Invoke(rows, columns);
+        }
+
+        /// <summary>
+        /// 棋盘行列标号：列标在棋盘上侧、行标在棋盘左侧，均从左上角以 1 起始，
+        /// 方便玩家根据线索按“第几行/第几列”定位。
+        /// </summary>
+        private void RefreshCoordinateLabels()
+        {
+            ClearCoordinateLabels();
+
+            if (gridRoot == null)
+            {
+                return;
+            }
+
+            GridLayoutGroup layout = gridRoot.GetComponent<GridLayoutGroup>();
+            TMP_FontAsset font = GetCoordinateFont();
+            if (layout == null || font == null || !EnsureCoordinateOverlay())
+            {
+                return;
+            }
+
+            float cellWidth = layout.cellSize.x;
+            float cellHeight = layout.cellSize.y;
+            float spacing = layout.spacing.x;
+            int columnCount = Mathf.Max(1, layout.constraintCount);
+            float totalWidth = columnCount * cellWidth + (columnCount - 1) * spacing;
+            float totalHeight = rows * cellHeight + (rows - 1) * spacing;
+            float originX = Mathf.Max(0f, (coordinateOverlay.rect.width - totalWidth) * 0.5f);
+            float originY = Mathf.Max(0f, (coordinateOverlay.rect.height - totalHeight) * 0.5f);
+            float fontSize = Mathf.Clamp(Mathf.Min(cellWidth, cellHeight) * 0.34f, 18f, 30f);
+
+            // 列标：棋盘上侧，从左到右 1..N。
+            for (int column = 0; column < columnCount; column++)
+            {
+                float x = originX + column * (cellWidth + spacing) + cellWidth * 0.5f;
+                AddCoordinateLabel((column + 1).ToString(), x, originY - CoordinateGap, fontSize, font);
+            }
+
+            // 行标：棋盘左侧，从上到下 1..N。
+            for (int row = 0; row < rows; row++)
+            {
+                float y = originY + row * (cellHeight + spacing) + cellHeight * 0.5f;
+                AddCoordinateLabel((row + 1).ToString(), originX - CoordinateGap, y, fontSize, font);
+            }
+        }
+
+        private TMP_FontAsset GetCoordinateFont()
+        {
+            if (coordinateFont == null)
+            {
+                coordinateFont = TMP_Settings.defaultFontAsset;
+            }
+
+            return coordinateFont;
+        }
+
+        private bool EnsureCoordinateOverlay()
+        {
+            if (coordinateOverlay != null)
+            {
+                return true;
+            }
+
+            if (gridRoot == null || gridRoot.parent == null)
+            {
+                return false;
+            }
+
+            GameObject overlayObject = new GameObject("CoordinateLabels", typeof(RectTransform));
+            overlayObject.layer = LayerMask.NameToLayer("UI");
+            coordinateOverlay = overlayObject.GetComponent<RectTransform>();
+            coordinateOverlay.SetParent(gridRoot.parent, false);
+
+            RectTransform gridRect = gridRoot;
+            coordinateOverlay.anchorMin = gridRect.anchorMin;
+            coordinateOverlay.anchorMax = gridRect.anchorMax;
+            coordinateOverlay.pivot = gridRect.pivot;
+            coordinateOverlay.anchoredPosition = gridRect.anchoredPosition;
+            coordinateOverlay.sizeDelta = gridRect.sizeDelta;
+            coordinateOverlay.SetAsLastSibling();
+            return true;
+        }
+
+        private void AddCoordinateLabel(
+            string text,
+            float x,
+            float y,
+            float fontSize,
+            TMP_FontAsset font)
+        {
+            GameObject labelObject = new GameObject(
+                "CoordLabel",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            labelObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform rect = labelObject.GetComponent<RectTransform>();
+            rect.SetParent(coordinateOverlay, false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(CoordinateLabelSize, CoordinateLabelSize);
+            rect.anchoredPosition = new Vector2(
+                x - coordinateOverlay.rect.width * 0.5f,
+                -(y - coordinateOverlay.rect.height * 0.5f));
+
+            TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+            label.font = font;
+            label.text = text;
+            label.fontSize = fontSize;
+            label.fontStyle = FontStyles.Bold;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = new Color(0.86f, 0.90f, 0.96f, 1f);
+            label.raycastTarget = false;
+            coordinateLabels.Add(labelObject);
+        }
+
+        private void ClearCoordinateLabels()
+        {
+            foreach (GameObject labelObject in coordinateLabels)
+            {
+                if (labelObject != null)
+                {
+                    Destroy(labelObject);
+                }
+            }
+
+            coordinateLabels.Clear();
         }
 
         /// <summary>
@@ -308,6 +446,7 @@ namespace Murdoku.Characters
                 {
                     cell.Clicked -= HandleCellClicked;
                     cell.LongPressed -= HandleCellLongPressed;
+                    cell.RightClicked -= HandleCellRightClicked;
                     cell.CharacterDropped -= HandleCharacterDropped;
                 }
             }
@@ -339,6 +478,11 @@ namespace Murdoku.Characters
         private void HandleCellLongPressed(ICharacterPlacementCell cell)
         {
             CellLongPressed?.Invoke(cell);
+        }
+
+        private void HandleCellRightClicked(ICharacterPlacementCell cell)
+        {
+            CellRightClicked?.Invoke(cell);
         }
 
         private void HandleCharacterDropped(CharacterData character, ICharacterPlacementCell cell)

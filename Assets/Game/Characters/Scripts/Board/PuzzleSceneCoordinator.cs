@@ -35,6 +35,10 @@ namespace Murdoku.Characters
         private TMP_Text popupTitleText;
         private TMP_Text popupMessageText;
         private Action popupConfirmAction;
+        private RectTransform popupOkRect;
+        private Button popupReturnButton;
+        private TMP_Text popupReturnLabel;
+        private Action popupReturnAction;
         private TMP_Text statusText;
         private Button clueButton;
         private Button submitButton;
@@ -75,18 +79,23 @@ namespace Murdoku.Characters
             public CharacterData MarkCharacter;
             public bool MarkWasAdded;
 
-            /// <summary>放置时被清除候选标记的格子（撤销放置时恢复这些标记）。</summary>
-            public List<PuzzleBoardCellUI> RestoreMarkCells;
-
             /// <summary>放置后被打上禁用标记（黑叉）的行列空格（撤销时清除）。</summary>
             public List<PuzzleBoardCellUI> DisabledCells;
 
             /// <summary>放置后从行列上清除的其他角色候选标记（撤销时恢复）。</summary>
             public List<(PuzzleBoardCellUI, CharacterData)> ClearedOtherMarks;
+
+            /// <summary>右键清空整格候选标记（撤销=恢复这些标记）。</summary>
+            public bool IsRemoveMarks;
+
+            /// <summary>右键清空前的整格候选标记快照。</summary>
+            public List<CharacterData> MarksSnapshot;
         }
 
         private readonly List<GameAction> undoActions = new List<GameAction>();
         private readonly List<GameAction> redoActions = new List<GameAction>();
+        private PuzzleBoardCellUI pendingReaddCell;
+        private CharacterData pendingReaddCharacter;
 
         private static readonly Color ErrorColor = new Color(0.92f, 0.35f, 0.35f, 1f);
         private static readonly Color SuccessColor = new Color(0.45f, 0.80f, 0.50f, 1f);
@@ -102,6 +111,7 @@ namespace Murdoku.Characters
             {
                 puzzleBoard.CellClicked += HandleCellClicked;
                 puzzleBoard.CellLongPressed += HandleCellLongPressed;
+                puzzleBoard.CellRightClicked += HandleCellRightClicked;
                 puzzleBoard.CharacterDropped += HandleCharacterDropped;
             }
         }
@@ -153,11 +163,13 @@ namespace Murdoku.Characters
         private void OnDisable()
         {
             popupConfirmAction = null;
+            popupReturnAction = null;
 
             if (puzzleBoard != null)
             {
                 puzzleBoard.CellClicked -= HandleCellClicked;
                 puzzleBoard.CellLongPressed -= HandleCellLongPressed;
+                puzzleBoard.CellRightClicked -= HandleCellRightClicked;
                 puzzleBoard.CharacterDropped -= HandleCharacterDropped;
             }
         }
@@ -331,6 +343,61 @@ namespace Murdoku.Characters
             }
 
             RefreshHighlights();
+        }
+
+        private void HandleCellRightClicked(ICharacterPlacementCell cell)
+        {
+            if (!(cell is PuzzleBoardCellUI cellUI) || placementController == null)
+            {
+                return;
+            }
+
+            CharacterData placedCharacter = cellUI.CurrentCharacter;
+            if (placedCharacter != null)
+            {
+                // 右键收回：清掉该人物在撤销/恢复栈里的旧放置记录，并放一条“待恢复”动作到恢复栈顶。
+                RemovePlacementActions(placedCharacter);
+                if (!placementController.RightClickRemoveCharacter(placedCharacter))
+                {
+                    SetStatus("收回失败：该人物当前不在棋盘上。", true);
+                    return;
+                }
+
+                if (puzzleBoard != null)
+                {
+                    puzzleBoard.ClearRowColumnCells(placedCharacter);
+                }
+
+                pendingReaddCell = cellUI;
+                pendingReaddCharacter = placedCharacter;
+                RefreshHighlights();
+                SetStatus("已将 " + placedCharacter.DisplayName + " 收回面板（可点「恢复」重新放置）。");
+                return;
+            }
+
+            if (cellUI.HasAnyCandidateMark)
+            {
+                List<CharacterData> snapshot = new List<CharacterData>(cellUI.CandidateMarks);
+                cellUI.ClearCandidateMarks();
+                PushRemoveMarksAction(cellUI, snapshot);
+                RefreshHighlights();
+                SetStatus("已清除该格的候选标记（可点「恢复」还原）。");
+                return;
+            }
+
+            SetStatus("该格没有可撤回的内容。");
+        }
+
+        /// <summary>删除该人物残留在撤销/恢复栈里的放置动作（右键收回后旧记录已失效）。</summary>
+        private void RemovePlacementActions(CharacterData character)
+        {
+            if (character == null)
+            {
+                return;
+            }
+
+            undoActions.RemoveAll(action => action.IsPlacement && ReferenceEquals(action.MarkCharacter, character));
+            redoActions.RemoveAll(action => action.IsPlacement && ReferenceEquals(action.MarkCharacter, character));
         }
 
         private void HandleCharacterDropped(CharacterData character, ICharacterPlacementCell cell)
@@ -861,7 +928,7 @@ namespace Murdoku.Characters
                 + "<b>3  放置人物</b>：长按格子，或把人物卡拖到格子三。\n"
                 + "<b>每一行、每一列都只能放置一个人。</b>\n"
                 + "<b>4  找出凶手</b>：与受害者单独同处一个区域的人就是凶手。\n"
-                + "摆放所有人物后，点击「提交」检查答案。";
+                + "摆放所有人物后，点击  提交  检查答案。";
             body.alignment = TextAlignmentOptions.TopLeft;
             body.color = new Color(0.90f, 0.93f, 0.97f, 1f);
             body.lineSpacing = 0f;
@@ -890,7 +957,12 @@ namespace Murdoku.Characters
             okLabel.raycastTarget = false;
         }
 
-        private void ShowPopup(string title, string message, Action onConfirmed = null)
+        private void ShowPopup(
+            string title,
+            string message,
+            Action onConfirmed = null,
+            string returnLabel = null,
+            Action onReturn = null)
         {
             if (popupRoot == null)
             {
@@ -900,11 +972,13 @@ namespace Murdoku.Characters
             if (popupRoot == null)
             {
                 popupConfirmAction = null;
+                popupReturnAction = null;
                 SetSaveHint("无法显示弹窗，请检查场景 Canvas 配置。", true);
                 return;
             }
 
             popupConfirmAction = onConfirmed;
+            popupReturnAction = onReturn;
             popupRoot.SetActive(true);
             if (popupTitleText != null)
             {
@@ -914,6 +988,23 @@ namespace Murdoku.Characters
             if (popupMessageText != null)
             {
                 popupMessageText.text = message;
+            }
+
+            bool hasReturnButton = !string.IsNullOrEmpty(returnLabel) && popupReturnButton != null;
+            if (popupReturnButton != null)
+            {
+                popupReturnButton.gameObject.SetActive(hasReturnButton);
+            }
+
+            if (popupReturnLabel != null)
+            {
+                popupReturnLabel.text = returnLabel ?? string.Empty;
+            }
+
+            // 单个按钮居中；两个按钮时确定偏右、返回偏左。
+            if (popupOkRect != null)
+            {
+                popupOkRect.anchoredPosition = new Vector2(hasReturnButton ? 170f : 0f, 29f);
             }
         }
 
@@ -967,6 +1058,7 @@ namespace Murdoku.Characters
             okRect.pivot = new Vector2(0.5f, 0.5f);
             okRect.sizeDelta = new Vector2(252f, 79f);
             okRect.anchoredPosition = new Vector2(0f, 29f);
+            popupOkRect = okRect;
 
             Image okImage = okRect.gameObject.AddComponent<Image>();
             okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
@@ -978,6 +1070,27 @@ namespace Murdoku.Characters
             TMP_Text okLabel = CreateText("Label", okRect, font, 32f, FontStyles.Normal);
             okLabel.text = "确定";
             Stretch(okLabel.rectTransform);
+
+            RectTransform returnRect = CreateUiObject("ReturnButton", panel).GetComponent<RectTransform>();
+            returnRect.anchorMin = new Vector2(0.5f, 0f);
+            returnRect.anchorMax = new Vector2(0.5f, 0f);
+            returnRect.pivot = new Vector2(0.5f, 0.5f);
+            returnRect.sizeDelta = new Vector2(252f, 79f);
+            returnRect.anchoredPosition = new Vector2(-170f, 29f);
+
+            Image returnImage = returnRect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(returnImage, 12);
+            returnImage.color = new Color(0.30f, 0.62f, 0.42f, 1f);
+            popupReturnButton = returnRect.gameObject.AddComponent<Button>();
+            popupReturnButton.targetGraphic = returnImage;
+            popupReturnButton.onClick.AddListener(HandlePopupReturnClicked);
+            UiClickFeedback.Ensure(popupReturnButton);
+
+            popupReturnLabel = CreateText("Label", returnRect, font, 32f, FontStyles.Bold);
+            popupReturnLabel.text = "继续游戏";
+            Stretch(popupReturnLabel.rectTransform);
+            popupReturnLabel.raycastTarget = false;
+            returnRect.gameObject.SetActive(false);
         }
 
         private static RectTransform CreateUiObject(string name, Transform parent)
@@ -1017,7 +1130,21 @@ namespace Murdoku.Characters
 
             Action confirmAction = popupConfirmAction;
             popupConfirmAction = null;
+            popupReturnAction = null;
             confirmAction?.Invoke();
+        }
+
+        private void HandlePopupReturnClicked()
+        {
+            if (popupRoot != null)
+            {
+                popupRoot.SetActive(false);
+            }
+
+            Action returnAction = popupReturnAction;
+            popupReturnAction = null;
+            popupConfirmAction = null;
+            returnAction?.Invoke();
         }
 
         private static void ReturnToLevelSelect()
@@ -1948,6 +2075,14 @@ namespace Murdoku.Characters
         /// </summary>
         private void PushPlacementAction(CharacterData placedCharacter)
         {
+            // 人物被正常放置回来时，清掉“待恢复”槽位（不再处于收回状态）。
+            if (pendingReaddCharacter != null && placedCharacter != null &&
+                ReferenceEquals(pendingReaddCharacter, placedCharacter))
+            {
+                pendingReaddCell = null;
+                pendingReaddCharacter = null;
+            }
+
             GameAction action = new GameAction
             {
                 IsPlacement = true,
@@ -1956,7 +2091,6 @@ namespace Murdoku.Characters
 
             if (playMode && placedCharacter != null && puzzleBoard != null)
             {
-                action.RestoreMarkCells = puzzleBoard.ClearCandidateMarksFor(placedCharacter);
                 if (placementController != null &&
                     placementController.TryGetPlacement(placedCharacter, out ICharacterPlacementCell atCell))
                 {
@@ -1977,6 +2111,17 @@ namespace Murdoku.Characters
                 MarkCell = cell,
                 MarkCharacter = character,
                 MarkWasAdded = wasAdded
+            });
+            redoActions.Clear();
+        }
+
+        private void PushRemoveMarksAction(PuzzleBoardCellUI cell, List<CharacterData> marks)
+        {
+            undoActions.Add(new GameAction
+            {
+                IsRemoveMarks = true,
+                MarkCell = cell,
+                MarksSnapshot = marks
             });
             redoActions.Clear();
         }
@@ -2008,18 +2153,6 @@ namespace Murdoku.Characters
                     return;
                 }
 
-                // 恢复该人物放置时被清除的候选标记（撤销放置后推理标记不丢失）。
-                if (action.RestoreMarkCells != null && action.MarkCharacter != null)
-                {
-                    foreach (PuzzleBoardCellUI restoreCell in action.RestoreMarkCells)
-                    {
-                        if (restoreCell != null)
-                        {
-                            restoreCell.ToggleCandidateMark(action.MarkCharacter);
-                        }
-                    }
-                }
-
                 // 只清除该人物在撤销前位置产生的自动叉号；手动叉号和其他人物来源保持不变。
                 if (action.MarkCharacter != null && puzzleBoard != null)
                 {
@@ -2049,6 +2182,20 @@ namespace Murdoku.Characters
                     }
                 }
             }
+            else if (action.IsRemoveMarks && action.MarkCell != null)
+            {
+                // 撤销右键清标记 = 恢复该格被清掉的候选标记。
+                if (action.MarksSnapshot != null)
+                {
+                    foreach (CharacterData mark in action.MarksSnapshot)
+                    {
+                        if (mark != null)
+                        {
+                            action.MarkCell.ToggleCandidateMark(mark);
+                        }
+                    }
+                }
+            }
             else if (action.MarkCell != null && action.MarkCharacter != null)
             {
                 action.MarkCell.ToggleCandidateMark(action.MarkCharacter);
@@ -2064,6 +2211,32 @@ namespace Murdoku.Characters
         /// </summary>
         private void HandleRedoClicked()
         {
+            // 优先恢复右键收回的人物：直接放回原格（不依赖撤销/恢复栈，保证可用）。
+            if (pendingReaddCharacter != null && pendingReaddCell != null)
+            {
+                PuzzleBoardCellUI readdCell = pendingReaddCell;
+                CharacterData readdCharacter = pendingReaddCharacter;
+                pendingReaddCell = null;
+                pendingReaddCharacter = null;
+
+                bool placed = placementController != null &&
+                              placementController.TryPlaceCharacterSilently(readdCharacter, readdCell);
+                if (placed && readdCharacter != null && puzzleBoard != null && placementController != null &&
+                    placementController.TryGetPlacement(
+                        readdCharacter,
+                        out ICharacterPlacementCell readdAtCell))
+                {
+                    puzzleBoard.DisableRowColumnCells(readdCharacter, readdAtCell);
+                    puzzleBoard.ClearOtherMarksInRowColumn(readdCharacter, readdAtCell);
+                }
+
+                RefreshHighlights();
+                SetStatus(placed
+                    ? "已恢复：将 " + (readdCharacter == null ? "人物" : readdCharacter.DisplayName) + " 放回原格。"
+                    : "无法恢复放置：目标格当前不可用。", !placed);
+                return;
+            }
+
             if (redoActions.Count == 0)
             {
                 SetStatus("没有可恢复的操作。");
@@ -2096,6 +2269,11 @@ namespace Murdoku.Characters
                     action.DisabledCells = puzzleBoard.DisableRowColumnCells(action.MarkCharacter, atCell);
                     action.ClearedOtherMarks = puzzleBoard.ClearOtherMarksInRowColumn(action.MarkCharacter, atCell);
                 }
+            }
+            else if (action.IsRemoveMarks && action.MarkCell != null)
+            {
+                // 恢复右键清标记 = 再次清空该格候选标记。
+                action.MarkCell.ClearCandidateMarks();
             }
             else if (action.MarkCell != null && action.MarkCharacter != null)
             {
@@ -2239,6 +2417,8 @@ namespace Murdoku.Characters
                 ShowPopup(
                     "破案成功！",
                     "凶手是 " + roomMates[0].DisplayName + "：TA 与受害者同处一室且身边没有其他人。",
+                    null,
+                    "继续游戏",
                     ReturnToLevelSelect);
                 SetStatus("破案成功！凶手是 " + roomMates[0].DisplayName + "。", false);
                 return;

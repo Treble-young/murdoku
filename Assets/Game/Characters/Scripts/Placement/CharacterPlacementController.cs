@@ -238,6 +238,55 @@ namespace Murdoku.Characters
         }
 
         /// <summary>
+        /// 右键收回：把人物从棋盘移除回面板，并删除该人物在撤销/恢复栈里的放置记录
+        /// （放回由协调器的“待恢复放置”动作负责，避免两个栈顺序错位）。
+        /// </summary>
+        public bool RightClickRemoveCharacter(CharacterData character)
+        {
+            if (character == null)
+            {
+                return false;
+            }
+
+            if (!placements.TryGetValue(character, out ICharacterPlacementCell cell) || cell == null)
+            {
+                return false;
+            }
+
+            cell.RemoveCharacter();
+            placements.Remove(character);
+            SetCharacterPlacedState(character, false);
+            undoHistory.RemoveAll(entry => entry.Character == character);
+            redoHistory.RemoveAll(entry => entry.Character == character);
+            return true;
+        }
+
+        /// <summary>
+        /// 撤销右键收回时使用：把人物静默放回指定格子（不写历史）。
+        /// </summary>
+        public bool TryPlaceCharacterSilently(CharacterData character, ICharacterPlacementCell cell)
+        {
+            if (character == null || cell == null || !cell.IsPlaceable || cell.IsOccupied)
+            {
+                return false;
+            }
+
+            if (HasRowOrColumnConflict(character, cell))
+            {
+                return false;
+            }
+
+            if (!cell.TryPlaceCharacter(character))
+            {
+                return false;
+            }
+
+            placements[character] = cell;
+            SetCharacterPlacedState(character, true);
+            return true;
+        }
+
+        /// <summary>
         /// 清空撤销与重做历史（载入关卡/重建棋盘时调用）。
         /// </summary>
         public void ClearUndoHistory()

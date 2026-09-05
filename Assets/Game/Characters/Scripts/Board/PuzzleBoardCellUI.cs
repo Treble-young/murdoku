@@ -69,6 +69,7 @@ namespace Murdoku.Characters
 
         public event Action<ICharacterPlacementCell> Clicked;
         public event Action<ICharacterPlacementCell> LongPressed;
+        public event Action<ICharacterPlacementCell> RightClicked;
         public event Action<CharacterData, ICharacterPlacementCell> CharacterDropped;
 
         public Vector2Int GridPosition => gridPosition;
@@ -186,6 +187,9 @@ namespace Murdoku.Characters
         /// <summary>该格是否存在任意候选标记（用于行列占用提示）。</summary>
         public bool HasAnyCandidateMark => candidateMarks.Count > 0;
 
+        /// <summary>当前格的候选人物（右键清除标记时用于记录快照）。</summary>
+        public IReadOnlyList<CharacterData> CandidateMarks => candidateMarks;
+
         private void RebuildCandidateMarkVisual()
         {
             foreach (GameObject chip in candidateMarkChips)
@@ -200,13 +204,20 @@ namespace Murdoku.Characters
 
             RectTransform cellRect = (RectTransform)transform;
             const float gridPadding = 3f;
+            bool compact = currentCharacter != null;
             float slotWidth = Mathf.Max(
                 1f,
                 (cellRect.rect.width - gridPadding * 2f) / CandidateMarkColumns);
             float slotHeight = Mathf.Max(
                 1f,
                 (cellRect.rect.height - gridPadding * 2f) / CandidateMarkRows);
-            float fontSize = Mathf.Clamp(Mathf.Min(slotWidth, slotHeight) * 0.88f, 20f, 42f);
+            float compactSize = Mathf.Clamp(
+                Mathf.Min(cellRect.rect.width, cellRect.rect.height) * 0.26f,
+                13f,
+                22f);
+            float fontSize = compact
+                ? compactSize
+                : Mathf.Clamp(Mathf.Min(slotWidth, slotHeight) * 0.88f, 20f, 42f);
             int visibleIndex = 0;
             for (int index = 0; index < candidateMarks.Count; index++)
             {
@@ -221,9 +232,6 @@ namespace Murdoku.Characters
                     continue;
                 }
 
-                int column = visibleIndex % CandidateMarkColumns;
-                int row = visibleIndex / CandidateMarkColumns;
-
                 // 纯字母标记：无底色徽章，使用 NotoSansSC 加粗显示角色首字母，颜色与人物卡一致。
                 // 黑色描边确保不同颜色的字母在明暗地块和道具上都清晰可辨。
                 GameObject letterObject = new GameObject(
@@ -237,10 +245,23 @@ namespace Murdoku.Characters
                 letterRect.anchorMin = new Vector2(0f, 1f);
                 letterRect.anchorMax = new Vector2(0f, 1f);
                 letterRect.pivot = new Vector2(0f, 1f);
-                letterRect.anchoredPosition = new Vector2(
-                    gridPadding + column * slotWidth,
-                    -(gridPadding + row * slotHeight));
-                letterRect.sizeDelta = new Vector2(slotWidth, slotHeight);
+                if (compact)
+                {
+                    // 占用格：标记缩小并排到左上角，保留线索避免重标。
+                    letterRect.anchoredPosition = new Vector2(
+                        gridPadding + visibleIndex * (compactSize + 2f),
+                        -gridPadding);
+                    letterRect.sizeDelta = new Vector2(compactSize, compactSize);
+                }
+                else
+                {
+                    int column = visibleIndex % CandidateMarkColumns;
+                    int row = visibleIndex / CandidateMarkColumns;
+                    letterRect.anchoredPosition = new Vector2(
+                        gridPadding + column * slotWidth,
+                        -(gridPadding + row * slotHeight));
+                    letterRect.sizeDelta = new Vector2(slotWidth, slotHeight);
+                }
 
                 TextMeshProUGUI label = letterObject.GetComponent<TextMeshProUGUI>();
                 if (candidateMarkFont != null)
@@ -287,6 +308,7 @@ namespace Murdoku.Characters
         {
             isPressed = false;
             HideLongPressRing();
+
             if (!longPressTriggered &&
                 Time.unscaledTime - pressStartTime >= LongPressSeconds &&
                 RectTransformUtility.RectangleContainsScreenPoint(
@@ -302,6 +324,22 @@ namespace Murdoku.Characters
 
         private void Update()
         {
+            // 右键检测：与长按一样直接走原始 Input（EventSystem 的右键 pointer 事件经常不触发，
+            // 会导致“右键收回”失效）。
+            if (interactionEnabled && Input.GetMouseButtonDown(1) &&
+                RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)transform,
+                    Input.mousePosition,
+                    null))
+            {
+                isPressed = false;
+                longPressTriggered = true;
+                suppressClick = true;
+                HideLongPressRing();
+                RightClicked?.Invoke(this);
+                return;
+            }
+
             // 长按检测：直接用 Input 系统（不依赖 EventSystem 的 pointer 事件链路，
             // 避免 press/click 事件被其他层拦截导致长按失效）。
             // 鼠标按下且落在本格内时启动计时；按住前 RingShowDelay 秒不显示读条，
@@ -798,8 +836,8 @@ namespace Murdoku.Characters
             }
 
             currentCharacter = character;
-            ClearCandidateMarks();
             RefreshToken();
+            RebuildCandidateMarkVisual();
             return true;
         }
 
@@ -807,6 +845,7 @@ namespace Murdoku.Characters
         {
             currentCharacter = null;
             RefreshToken();
+            RebuildCandidateMarkVisual();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
