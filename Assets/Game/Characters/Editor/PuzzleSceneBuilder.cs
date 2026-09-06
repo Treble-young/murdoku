@@ -1176,7 +1176,7 @@ namespace Murdoku.Characters.Editor
 
             Image inputBackground = AddImage("SizeInput", row, new Color(0.92f, 0.94f, 0.97f, 1f));
             LayoutElement inputLayout = inputBackground.gameObject.AddComponent<LayoutElement>();
-            inputLayout.preferredWidth = 108f;
+            inputLayout.preferredWidth = 76f;
             inputLayout.preferredHeight = 36f;
 
             TMP_Text placeholder = AddText(
@@ -1209,7 +1209,7 @@ namespace Murdoku.Characters.Editor
 
             Image buttonBackground = AddImage("GenerateButton", row, new Color(0.22f, 0.48f, 0.86f, 1f));
             LayoutElement buttonLayout = buttonBackground.gameObject.AddComponent<LayoutElement>();
-            buttonLayout.preferredWidth = 118f;
+            buttonLayout.preferredWidth = 150f;
             buttonLayout.preferredHeight = 36f;
             Button generateButton = buttonBackground.gameObject.AddComponent<Button>();
             generateButton.targetGraphic = buttonBackground;
@@ -1228,6 +1228,8 @@ namespace Murdoku.Characters.Editor
                 TextAlignmentOptions.Center);
             Stretch(buttonText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             buttonText.fontStyle = FontStyles.Bold;
+            buttonText.textWrappingMode = TextWrappingModes.NoWrap;
+            buttonText.overflowMode = TextOverflowModes.Overflow;
             buttonText.raycastTarget = false;
 
             Button placeModeButton = CreateModeButton(
@@ -1435,7 +1437,7 @@ namespace Murdoku.Characters.Editor
             {
                 if (cachedFont == null)
                 {
-                    cachedFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/fonts/NotoSansSC-Regular SDF.asset");
+                    cachedFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/fonts/朱雀仿宋 SDF.asset");
                     if (cachedFont == null)
                     {
                         cachedFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(

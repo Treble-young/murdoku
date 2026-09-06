@@ -311,7 +311,7 @@
         },
         {
             "characterId": "B",
-            "clue": "在柜子旁边，但不在床三",
+            "clue": "在柜子旁边，但不在床上",
             "name": "Bob",
             "gender": 1
         },

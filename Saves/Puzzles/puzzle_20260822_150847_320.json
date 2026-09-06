@@ -306,13 +306,13 @@
         },
         {
             "characterId": "B",
-            "clue": "唯一一个坐在椅子三的人",
+            "clue": "唯一一个坐在椅子上的人",
             "name": "Betty",
             "gender": 2
         },
         {
             "characterId": "C",
-            "clue": "在雪地三，  但不在雪人旁边",
+            "clue": "在雪地上，  但不在雪人旁边",
             "name": "Cathy",
             "gender": 2
         },

@@ -577,13 +577,13 @@
         },
         {
             "characterId": "B",
-            "clue": "坐在座位三  ，还有一名老师也在这个区域",
+            "clue": "坐在座位上  ，还有一名老师也在这个区域",
             "name": "Bella",
             "gender": 2
         },
         {
             "characterId": "C",
-            "clue": "在Eddie的三方一行",
+            "clue": "在Eddie的上方一行",
             "name": "Carl",
             "gender": 1
         },
@@ -619,7 +619,7 @@
         },
         {
             "characterId": "I",
-            "clue": "在倒数第丈列",
+            "clue": "在倒数第三列",
             "name": "Ingrid",
             "gender": 2
         },

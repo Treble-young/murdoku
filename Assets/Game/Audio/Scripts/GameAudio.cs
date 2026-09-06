@@ -32,6 +32,7 @@ namespace Murdoku.Audio
         private const string InvestigationMusicResourcePath = "Audio/Music/investigation_strings_choir";
         private const string MainMenuSceneName = "MainMenuScene";
         private const string LevelSelectSceneName = "LevelSelectScene";
+        private const string MasterVolumePreferenceKey = "audio.masterVolume";
         private const float MusicVolume = 0.3f;
         private const float MusicFadeDuration = 0.75f;
 
@@ -44,6 +45,16 @@ namespace Murdoku.Audio
         private Coroutine musicTransitionCoroutine;
         private MusicCue? currentMusicCue;
         private bool initialized;
+        private float masterVolume = 1f;
+
+        public static float MasterVolume
+        {
+            get
+            {
+                GameAudio audio = EnsureInstance();
+                return audio == null ? 1f : audio.masterVolume;
+            }
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -73,6 +84,19 @@ namespace Murdoku.Audio
             {
                 audio.SetMusicInternal(cue);
             }
+        }
+
+        public static void SetMasterVolume(float volume)
+        {
+            GameAudio audio = EnsureInstance();
+            if (audio == null)
+            {
+                return;
+            }
+
+            audio.masterVolume = Mathf.Clamp01(volume);
+            AudioListener.volume = audio.masterVolume;
+            PlayerPrefs.SetFloat(MasterVolumePreferenceKey, audio.masterVolume);
         }
 
         private static GameAudio EnsureInstance()
@@ -130,6 +154,9 @@ namespace Murdoku.Audio
             musicSource = gameObject.AddComponent<AudioSource>();
             ConfigureSource(musicSource, MusicVolume);
             musicSource.loop = true;
+
+            masterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterVolumePreferenceKey, 1f));
+            AudioListener.volume = masterVolume;
 
             sfxClips[SfxCue.UiClick] = LoadClip(ClickResourcePath, "UI click");
             sfxClips[SfxCue.CharacterPlace] = LoadClip(PlaceResourcePath, "character place");

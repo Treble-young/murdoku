@@ -38,6 +38,12 @@ namespace Murdoku.Characters
             {
                 UiClickFeedback.Ensure(generateButton);
                 generateButton.onClick.AddListener(HandleGenerateClicked);
+                TMP_Text generateLabel = generateButton.GetComponentInChildren<TMP_Text>(true);
+                if (generateLabel != null)
+                {
+                    generateLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                    generateLabel.overflowMode = TextOverflowModes.Overflow;
+                }
             }
 
             if (placeModeButton != null)

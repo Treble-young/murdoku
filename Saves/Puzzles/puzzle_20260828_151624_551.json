@@ -305,13 +305,13 @@
     "clues": [
         {
             "characterId": "A",
-            "clue": "坐在椅子三",
+            "clue": "坐在椅子上",
             "name": "Amy",
             "gender": 2
         },
         {
             "characterId": "B",
-            "clue": "在中庭，  且在Emma的三方一行",
+            "clue": "在中庭，  且在Emma的上方一行",
             "name": "Brian",
             "gender": 1
         },
@@ -323,7 +323,7 @@
         },
         {
             "characterId": "D",
-            "clue": "在地毯三",
+            "clue": "在地毯上",
             "name": "Diana",
             "gender": 2
         },

@@ -346,8 +346,8 @@ namespace Murdoku
                 rect.anchorMin = new Vector2(0f, 0.5f);
                 rect.anchorMax = new Vector2(0f, 0.5f);
                 rect.pivot = new Vector2(0f, 0.5f);
-                rect.sizeDelta = new Vector2(130f, 52f);
-                rect.anchoredPosition = new Vector2(40f, 160f - index * 64f);
+                rect.sizeDelta = new Vector2(150f, 58f);
+                rect.anchoredPosition = new Vector2(40f, 175f - index * 70f);
 
                 Image background = tabObject.GetComponent<Image>();
                 background.color = normalColor;
@@ -374,7 +374,7 @@ namespace Murdoku
 
                 TMP_Text label = labelObject.GetComponent<TextMeshProUGUI>();
                 label.font = font;
-                label.fontSize = 22f;
+                label.fontSize = 24f;
                 label.fontStyle = FontStyles.Bold;
                 label.color = new Color(0.16f, 0.20f, 0.26f, 1f);
                 label.alignment = TextAlignmentOptions.Center;

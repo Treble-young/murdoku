@@ -44,7 +44,13 @@ namespace Murdoku.Characters
         private Button submitButton;
         private Button undoButton;
         private Button redoButton;
+        private Button clearButton;
         private Button regionNameButton;
+        private Button volumeButton;
+        private GameObject volumePanelRoot;
+        private TMP_Text volumeButtonLabel;
+        private TMP_Text volumeValueLabel;
+        private Slider volumeSlider;
         private GameObject cluePanelRoot;
         private RectTransform clueContentRect;
         private TMP_InputField globalClueInput;
@@ -126,6 +132,7 @@ namespace Murdoku.Characters
             GameAudio.SetMusic(playMode ? MusicCue.Investigation : MusicCue.Main);
             SetStatus("点击人物后选择格子，或直接拖动人物卡到右侧格子。");
             EnsureGameplayButtons();
+            EnsureVolumeControls();
             EnsureRegionPanel();
             EnsurePropsPanel();
             ApplyModeVisibility();
@@ -355,23 +362,7 @@ namespace Murdoku.Characters
             CharacterData placedCharacter = cellUI.CurrentCharacter;
             if (placedCharacter != null)
             {
-                // 右键收回：清掉该人物在撤销/恢复栈里的旧放置记录，并放一条“待恢复”动作到恢复栈顶。
-                RemovePlacementActions(placedCharacter);
-                if (!placementController.RightClickRemoveCharacter(placedCharacter))
-                {
-                    SetStatus("收回失败：该人物当前不在棋盘上。", true);
-                    return;
-                }
-
-                if (puzzleBoard != null)
-                {
-                    puzzleBoard.ClearRowColumnCells(placedCharacter);
-                }
-
-                pendingReaddCell = cellUI;
-                pendingReaddCharacter = placedCharacter;
-                RefreshHighlights();
-                SetStatus("已将 " + placedCharacter.DisplayName + " 收回面板（可点「恢复」重新放置）。");
+                TryReturnCharacterToPanel(placedCharacter, cellUI);
                 return;
             }
 
@@ -386,6 +377,42 @@ namespace Murdoku.Characters
             }
 
             SetStatus("该格没有可撤回的内容。");
+        }
+
+        private void HandleCharacterReturnRequested(CharacterData character, ICharacterPlacementCell sourceCell)
+        {
+            if (!playMode || !(sourceCell is PuzzleBoardCellUI cellUI))
+            {
+                return;
+            }
+
+            TryReturnCharacterToPanel(character, cellUI);
+        }
+
+        /// <summary>右键或拖回嫌疑人面板时，统一执行人物收回和自动标记清理。</summary>
+        private void TryReturnCharacterToPanel(CharacterData character, PuzzleBoardCellUI sourceCell)
+        {
+            if (character == null || sourceCell == null || placementController == null)
+            {
+                return;
+            }
+
+            RemovePlacementActions(character);
+            if (!placementController.RightClickRemoveCharacter(character))
+            {
+                SetStatus("收回失败：该人物当前不在棋盘上。", true);
+                return;
+            }
+
+            if (puzzleBoard != null)
+            {
+                puzzleBoard.ClearRowColumnCells(character);
+            }
+
+            pendingReaddCell = sourceCell;
+            pendingReaddCharacter = character;
+            RefreshHighlights();
+            SetStatus("已将 " + character.DisplayName + " 收回面板（可点「恢复」重新放置）。");
         }
 
         /// <summary>删除该人物残留在撤销/恢复栈里的放置动作（右键收回后旧记录已失效）。</summary>
@@ -923,9 +950,9 @@ namespace Murdoku.Characters
             titleRect.anchoredPosition = new Vector2(0f, -16f);
 
             TMP_Text body = CreateText("BodyText", panel, font, 36f, FontStyles.Normal);
-            body.text = "<b>1  阅读线索</b>：人物卡三的是个人线索；全局线索对所有人有效。\n"
+            body.text = "<b>1  阅读线索</b>：人物卡上的是个人线索；全局线索对所有人有效。\n"
                 + "<b>2  标记候选</b>：选中人物后单击格子；再次单击即可取消。\n"
-                + "<b>3  放置人物</b>：长按格子，或把人物卡拖到格子三。\n"
+                + "<b>3  放置人物</b>：长按格子，或把人物卡拖到格子上。\n"
                 + "<b>每一行、每一列都只能放置一个人。</b>\n"
                 + "<b>4  找出凶手</b>：与受害者单独同处一个区域的人就是凶手。\n"
                 + "摆放所有人物后，点击  提交  检查答案。";
@@ -1164,7 +1191,7 @@ namespace Murdoku.Characters
 
         private void EnsureGameplayButtons()
         {
-            if (clueButton != null && submitButton != null && undoButton != null && redoButton != null)
+            if (clueButton != null && submitButton != null && undoButton != null && redoButton != null && clearButton != null)
             {
                 return;
             }
@@ -1207,6 +1234,13 @@ namespace Murdoku.Characters
                     redoButton.onClick.AddListener(HandleRedoClicked);
                 }
 
+                if (clearButton == null)
+                {
+                    clearButton = CreateHeaderButton(header, "ClearButton", "清空",
+                        new Vector2(0f, 0f), new Vector2(0.25f, 0.46f));
+                    clearButton.onClick.AddListener(HandleClearClicked);
+                }
+
                 if (undoButton == null)
                 {
                     undoButton = CreateHeaderButton(header, "UndoButton", "撤销",
@@ -1241,6 +1275,149 @@ namespace Murdoku.Characters
             {
                 submitButton = CreateTopButton(canvas.transform, "SubmitButton", "提交", new Vector2(-70f, -12f));
                 submitButton.onClick.AddListener(SubmitPuzzle);
+            }
+        }
+
+        /// <summary>游玩与出题模式共用的右下角音量按钮和滑杆。</summary>
+        private void EnsureVolumeControls()
+        {
+            if (volumeButton != null)
+            {
+                return;
+            }
+
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            TMP_FontAsset font = GetUiFont();
+            if (canvas == null || font == null)
+            {
+                return;
+            }
+
+            RectTransform buttonRect = CreateUiObject("VolumeButton", canvas.transform).GetComponent<RectTransform>();
+            buttonRect.anchorMin = new Vector2(1f, 0f);
+            buttonRect.anchorMax = new Vector2(1f, 0f);
+            buttonRect.pivot = new Vector2(1f, 0f);
+            buttonRect.anchoredPosition = new Vector2(-24f, 24f);
+            buttonRect.sizeDelta = new Vector2(170f, 54f);
+
+            Image buttonImage = buttonRect.gameObject.AddComponent<Image>();
+            buttonImage.color = new Color(0.22f, 0.48f, 0.86f, 0.96f);
+            UiRoundedSprite.Apply(buttonImage, 12);
+
+            volumeButton = buttonRect.gameObject.AddComponent<Button>();
+            volumeButton.targetGraphic = buttonImage;
+            volumeButton.onClick.AddListener(ToggleVolumePanel);
+            UiClickFeedback.Ensure(volumeButton);
+
+            volumeButtonLabel = CreateText("Label", buttonRect, font, 21f, FontStyles.Bold);
+            Stretch(volumeButtonLabel.rectTransform);
+            volumeButtonLabel.raycastTarget = false;
+
+            RectTransform panelRect = CreateUiObject("VolumePanel", canvas.transform).GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(1f, 0f);
+            panelRect.anchorMax = new Vector2(1f, 0f);
+            panelRect.pivot = new Vector2(1f, 0f);
+            panelRect.anchoredPosition = new Vector2(-24f, 90f);
+            panelRect.sizeDelta = new Vector2(420f, 132f);
+            volumePanelRoot = panelRect.gameObject;
+
+            Image panelImage = panelRect.gameObject.AddComponent<Image>();
+            panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.96f);
+            UiRoundedSprite.Apply(panelImage, 16);
+
+            TMP_Text title = CreateText("Title", panelRect, font, 24f, FontStyles.Bold);
+            title.text = "音量";
+            title.alignment = TextAlignmentOptions.MidlineLeft;
+            title.rectTransform.anchorMin = new Vector2(0f, 1f);
+            title.rectTransform.anchorMax = new Vector2(0f, 1f);
+            title.rectTransform.pivot = new Vector2(0f, 1f);
+            title.rectTransform.anchoredPosition = new Vector2(22f, -12f);
+            title.rectTransform.sizeDelta = new Vector2(100f, 42f);
+
+            volumeValueLabel = CreateText("Value", panelRect, font, 24f, FontStyles.Bold);
+            volumeValueLabel.alignment = TextAlignmentOptions.MidlineRight;
+            volumeValueLabel.rectTransform.anchorMin = new Vector2(1f, 1f);
+            volumeValueLabel.rectTransform.anchorMax = new Vector2(1f, 1f);
+            volumeValueLabel.rectTransform.pivot = new Vector2(1f, 1f);
+            volumeValueLabel.rectTransform.anchoredPosition = new Vector2(-22f, -12f);
+            volumeValueLabel.rectTransform.sizeDelta = new Vector2(120f, 42f);
+
+            RectTransform sliderRect = CreateUiObject("Slider", panelRect).GetComponent<RectTransform>();
+            sliderRect.anchorMin = new Vector2(0f, 0f);
+            sliderRect.anchorMax = new Vector2(1f, 0f);
+            sliderRect.pivot = new Vector2(0.5f, 0f);
+            sliderRect.offsetMin = new Vector2(24f, 22f);
+            sliderRect.offsetMax = new Vector2(-24f, 58f);
+
+            Image trackImage = sliderRect.gameObject.AddComponent<Image>();
+            trackImage.color = new Color(0.36f, 0.39f, 0.44f, 1f);
+            UiRoundedSprite.Apply(trackImage, 8);
+
+            RectTransform fillRect = CreateUiObject("Fill", sliderRect).GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(5f, 7f);
+            fillRect.offsetMax = new Vector2(-5f, -7f);
+            Image fillImage = fillRect.gameObject.AddComponent<Image>();
+            fillImage.color = new Color(0.35f, 0.68f, 0.95f, 1f);
+            UiRoundedSprite.Apply(fillImage, 6);
+
+            RectTransform handleRect = CreateUiObject("Handle", sliderRect).GetComponent<RectTransform>();
+            handleRect.sizeDelta = new Vector2(34f, 34f);
+            Image handleImage = handleRect.gameObject.AddComponent<Image>();
+            handleImage.color = Color.white;
+            UiRoundedSprite.Apply(handleImage, 17);
+
+            volumeSlider = sliderRect.gameObject.AddComponent<Slider>();
+            volumeSlider.targetGraphic = handleImage;
+            volumeSlider.fillRect = fillRect;
+            volumeSlider.handleRect = handleRect;
+            volumeSlider.direction = Slider.Direction.LeftToRight;
+            volumeSlider.minValue = 0f;
+            volumeSlider.maxValue = 1f;
+            volumeSlider.wholeNumbers = false;
+            volumeSlider.SetValueWithoutNotify(GameAudio.MasterVolume);
+            volumeSlider.onValueChanged.AddListener(HandleVolumeChanged);
+
+            RefreshVolumeLabels(GameAudio.MasterVolume);
+            volumePanelRoot.SetActive(false);
+        }
+
+        private void ToggleVolumePanel()
+        {
+            if (volumePanelRoot == null)
+            {
+                return;
+            }
+
+            bool show = !volumePanelRoot.activeSelf;
+            volumePanelRoot.SetActive(show);
+            if (show)
+            {
+                volumePanelRoot.transform.SetAsLastSibling();
+                float currentVolume = GameAudio.MasterVolume;
+                volumeSlider.SetValueWithoutNotify(currentVolume);
+                RefreshVolumeLabels(currentVolume);
+            }
+        }
+
+        private void HandleVolumeChanged(float volume)
+        {
+            GameAudio.SetMasterVolume(volume);
+            RefreshVolumeLabels(volume);
+        }
+
+        private void RefreshVolumeLabels(float volume)
+        {
+            int percentage = Mathf.RoundToInt(Mathf.Clamp01(volume) * 100f);
+            if (volumeButtonLabel != null)
+            {
+                volumeButtonLabel.text = percentage == 0 ? "音量：静音" : "音量：" + percentage + "%";
+            }
+
+            if (volumeValueLabel != null)
+            {
+                volumeValueLabel.text = percentage + "%";
             }
         }
 
@@ -1353,6 +1530,8 @@ namespace Murdoku.Characters
             {
                 panel.SelectionChanged += HandleCharacterSelectionChanged;
                 panel.BlackXModeChanged += HandleBlackXModeChanged;
+                panel.CharacterReturnRequested -= HandleCharacterReturnRequested;
+                panel.CharacterReturnRequested += HandleCharacterReturnRequested;
             }
         }
 
@@ -2285,6 +2464,44 @@ namespace Murdoku.Characters
             SetStatus("已恢复上一步操作。");
         }
 
+        /// <summary>清空游玩棋盘上的全部人物和玩家推理标记。</summary>
+        private void HandleClearClicked()
+        {
+            if (!playMode)
+            {
+                return;
+            }
+
+            if (placementController != null)
+            {
+                placementController.ClearAllPlacements();
+                CharacterPanelUI panel = placementController.SelectionSource;
+                if (panel != null)
+                {
+                    panel.ClearSelection();
+                }
+            }
+
+            if (puzzleBoard != null)
+            {
+                foreach (PuzzleBoardCellUI cell in puzzleBoard.Cells)
+                {
+                    if (cell != null)
+                    {
+                        cell.ClearPlayMarks();
+                    }
+                }
+
+                puzzleBoard.RefreshRowColumnHighlights();
+            }
+
+            undoActions.Clear();
+            redoActions.Clear();
+            pendingReaddCell = null;
+            pendingReaddCharacter = null;
+            SetStatus("已清空棋盘上的人物和标记。");
+        }
+
         private void SubmitPuzzle()
         {
             if (puzzleBoard != null)
@@ -2609,6 +2826,11 @@ namespace Murdoku.Characters
             if (redoButton != null)
             {
                 redoButton.gameObject.SetActive(playMode);
+            }
+
+            if (clearButton != null)
+            {
+                clearButton.gameObject.SetActive(playMode);
             }
 
             EnsureTutorialButton();

@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using Murdoku.Audio;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Murdoku.Characters
 {
-    public sealed class CharacterPanelUI : MonoBehaviour
+    public sealed class CharacterPanelUI : MonoBehaviour, IDropHandler
     {
         [SerializeField] private CharacterPanelView view;
         [SerializeField] private CharacterCardUI cardPrefab;
@@ -28,6 +29,9 @@ namespace Murdoku.Characters
 
         public event Action<CharacterData> SelectionChanged;
 
+        /// <summary>把棋盘人物拖回嫌疑人面板时发出收回请求。</summary>
+        public event Action<CharacterData, ICharacterPlacementCell> CharacterReturnRequested;
+
         /// <summary>黑叉模式切换事件（true = 禁止放置模式激活）。</summary>
         public event Action<bool> BlackXModeChanged;
 
@@ -39,6 +43,21 @@ namespace Murdoku.Characters
         public IReadOnlyList<CharacterData> Characters => characters;
 
         public CharacterPortraitCatalog PortraitCatalog => portraitCatalog;
+
+        public void OnDrop(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.pointerDrag == null)
+            {
+                return;
+            }
+
+            PuzzleBoardCellUI sourceCell = eventData.pointerDrag.GetComponentInParent<PuzzleBoardCellUI>();
+            CharacterData character = sourceCell == null ? null : sourceCell.CurrentCharacter;
+            if (character != null)
+            {
+                CharacterReturnRequested?.Invoke(character, sourceCell);
+            }
+        }
 
         /// <summary>
         /// 把存档中的角色线索写回运行时角色数据，并刷新所有卡片的线索文本。

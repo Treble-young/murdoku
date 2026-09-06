@@ -102,6 +102,8 @@ namespace Murdoku
                 data.id = GenerateId();
             }
 
+            NormalizeLegacyFontSubstitutions(data);
+
             Directory.CreateDirectory(PuzzlesDirectory);
             string path = Path.Combine(PuzzlesDirectory, data.id + ".json");
             File.WriteAllText(path, JsonUtility.ToJson(data, true));
@@ -124,7 +126,9 @@ namespace Murdoku
 
             try
             {
-                return JsonUtility.FromJson<PuzzleData>(File.ReadAllText(path));
+                PuzzleData data = JsonUtility.FromJson<PuzzleData>(File.ReadAllText(path));
+                NormalizeLegacyFontSubstitutions(data);
+                return data;
             }
             catch (Exception exception)
             {
@@ -148,6 +152,7 @@ namespace Murdoku
                 try
                 {
                     PuzzleData data = JsonUtility.FromJson<PuzzleData>(File.ReadAllText(file));
+                    NormalizeLegacyFontSubstitutions(data);
                     if (data != null && !string.IsNullOrEmpty(data.id))
                     {
                         result.Add(data);
@@ -162,6 +167,59 @@ namespace Murdoku
             // id 含时间戳，按 id 倒序 = 最近创建的排前面。
             result.Sort((left, right) => string.Compare(right.id, left.id, StringComparison.Ordinal));
             return result;
+        }
+
+        /// <summary>
+        /// 早期字体的字形映射有误，部分关卡曾用其他汉字代替目标汉字。
+        /// 这里只迁移已经核实的词组，避免把正常出现的“三”等文字误改。
+        /// </summary>
+        private static void NormalizeLegacyFontSubstitutions(PuzzleData data)
+        {
+            if (data == null)
+            {
+                return;
+            }
+
+            data.name = NormalizeLegacyFontText(data.name);
+            data.globalClue = NormalizeLegacyFontText(data.globalClue);
+            if (data.clues == null)
+            {
+                return;
+            }
+
+            foreach (PuzzleClueData clue in data.clues)
+            {
+                if (clue == null)
+                {
+                    continue;
+                }
+
+                clue.name = NormalizeLegacyFontText(clue.name);
+                clue.clue = NormalizeLegacyFontText(clue.clue);
+            }
+        }
+
+        private static string NormalizeLegacyFontText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return text
+                .Replace("人物卡三", "人物卡上")
+                .Replace("格子三", "格子上")
+                .Replace("椅子三", "椅子上")
+                .Replace("长椅三", "长椅上")
+                .Replace("座位三", "座位上")
+                .Replace("雪地三", "雪地上")
+                .Replace("地毯三", "地毯上")
+                .Replace("贝壳三", "贝壳上")
+                .Replace("游泳圈三", "游泳圈上")
+                .Replace("床三", "床上")
+                .Replace("三面", "上面")
+                .Replace("三方", "上方")
+                .Replace("第丈", "第三");
         }
 
         public static bool NameExists(string name)

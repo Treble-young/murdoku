@@ -295,6 +295,27 @@ namespace Murdoku.Characters
             redoHistory.Clear();
         }
 
+        /// <summary>移除棋盘上的全部人物并清空放置历史，供游玩模式的“清空”功能使用。</summary>
+        public void ClearAllPlacements()
+        {
+            foreach (KeyValuePair<CharacterData, ICharacterPlacementCell> pair in placements)
+            {
+                if (pair.Value != null)
+                {
+                    pair.Value.RemoveCharacter();
+                }
+
+                if (pair.Key != null)
+                {
+                    SetCharacterPlacedState(pair.Key, false);
+                }
+            }
+
+            placements.Clear();
+            undoHistory.Clear();
+            redoHistory.Clear();
+        }
+
         /// <summary>
         /// Murdoku 核心规则：每行、每列最多站一个人。
         /// 目标格所在行/列已被其他角色占用时拒绝放置（移动时跳过自身旧位置）。

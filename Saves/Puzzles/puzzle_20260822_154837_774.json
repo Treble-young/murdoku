@@ -228,7 +228,7 @@
     "clues": [
         {
             "characterId": "A",
-            "clue": "在沙滩的躺椅三",
+            "clue": "在沙滩的躺椅上",
             "name": "Alan",
             "gender": 1
         },
@@ -240,7 +240,7 @@
         },
         {
             "characterId": "C",
-            "clue": "在贝壳三",
+            "clue": "在贝壳上",
             "name": "Carl",
             "gender": 2
         },
@@ -252,7 +252,7 @@
         },
         {
             "characterId": "E",
-            "clue": "在游泳圈三",
+            "clue": "在游泳圈上",
             "name": "Eva",
             "gender": 2
         },

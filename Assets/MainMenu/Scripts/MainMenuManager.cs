@@ -24,8 +24,24 @@ public class MainMenuManager : MonoBehaviour
     {
         instructionPanel.SetActive(false);
         maskBlack.SetActive(false);
+        DisableMainMenuButtonWrapping();
         CreateFeedbackButton();
         CreateFeedbackPanel();
+    }
+
+    private static void DisableMainMenuButtonWrapping()
+    {
+        string[] buttonNames = { "start", "create", "end" };
+        foreach (string buttonName in buttonNames)
+        {
+            GameObject buttonObject = GameObject.Find(buttonName);
+            TMP_Text label = buttonObject == null ? null : buttonObject.GetComponentInChildren<TMP_Text>();
+            if (label != null)
+            {
+                label.enableWordWrapping = false;
+                label.overflowMode = TextOverflowModes.Overflow;
+            }
+        }
     }
 
     // 打开教程：同时显示遮罩+弹窗
@@ -88,6 +104,8 @@ public class MainMenuManager : MonoBehaviour
         if (label != null)
         {
             label.text = "内容反馈";
+            label.enableWordWrapping = false;
+            label.overflowMode = TextOverflowModes.Overflow;
         }
 
         Button button = feedbackButtonObject.GetComponent<Button>();

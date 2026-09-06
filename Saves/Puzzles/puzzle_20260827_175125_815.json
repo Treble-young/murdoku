@@ -233,13 +233,13 @@
     "clues": [
         {
             "characterId": "A",
-            "clue": "在第丈列",
+            "clue": "在第三列",
             "name": "Alice",
             "gender": 2
         },
         {
             "characterId": "B",
-            "clue": "在长椅三",
+            "clue": "在长椅上",
             "name": "Ben",
             "gender": 1
         },

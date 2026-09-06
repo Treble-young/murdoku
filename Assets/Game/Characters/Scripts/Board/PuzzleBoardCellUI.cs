@@ -85,6 +85,28 @@ namespace Murdoku.Characters
         /// <summary>是否禁止放置人物（出题人禁放规则 + 游玩玩家标记任一为真）。</summary>
         public bool IsForbidden => editorForbidden || playerMarked || automaticMarkSources.Count > 0;
 
+        /// <summary>
+        /// 移动人物时允许落到仅由该人物自身自动限制的格子；
+        /// 关卡禁放、手动叉号或其他人物产生的限制仍会拒绝放置。
+        /// </summary>
+        private bool IsForbiddenFor(CharacterData character)
+        {
+            if (editorForbidden || playerMarked)
+            {
+                return true;
+            }
+
+            foreach (CharacterData source in automaticMarkSources)
+            {
+                if (source != null && !ReferenceEquals(source, character))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>出题人禁放状态（保存进关卡；游玩模式隐形生效）。</summary>
         public bool EditorForbidden => editorForbidden;
 
@@ -179,6 +201,21 @@ namespace Murdoku.Characters
             RebuildCandidateMarkVisual();
         }
 
+        /// <summary>
+        /// 清除游玩过程中产生的候选字母、手动叉号、自动行列叉号与错误高亮。
+        /// 保留关卡作者设置的禁放格、地块和道具。
+        /// </summary>
+        public void ClearPlayMarks()
+        {
+            candidateMarks.Clear();
+            playerMarked = false;
+            automaticMarkSources.Clear();
+            RebuildCandidateMarkVisual();
+            RefreshForbiddenMark();
+            SetRowColumnHighlight(false);
+            SetErrorHighlight(false);
+        }
+
         public bool HasCandidateMark(CharacterData character)
         {
             return character != null && candidateMarks.Contains(character);
@@ -232,7 +269,7 @@ namespace Murdoku.Characters
                     continue;
                 }
 
-                // 纯字母标记：无底色徽章，使用 NotoSansSC 加粗显示角色首字母，颜色与人物卡一致。
+                // 纯字母标记：无底色徽章，使用全局朱雀仿宋加粗显示角色首字母，颜色与人物卡一致。
                 // 黑色描边确保不同颜色的字母在明暗地块和道具上都清晰可辨。
                 GameObject letterObject = new GameObject(
                     "MarkLetter",
@@ -830,7 +867,7 @@ namespace Murdoku.Characters
 
         public bool TryPlaceCharacter(CharacterData character)
         {
-            if (!isPlaceable || currentCharacter != null || character == null || IsForbidden)
+            if (!isPlaceable || currentCharacter != null || character == null || IsForbiddenFor(character))
             {
                 return false;
             }
