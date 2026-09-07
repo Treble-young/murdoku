@@ -51,6 +51,7 @@ namespace Murdoku.Characters
         private CanvasGroup interactionGroup;
         private Image rowColumnHighlight;
         private Image errorHighlight;
+        private Image tutorialHighlight;
         private Image regionOverlay;
         private Image propImage;
         private bool editorForbidden;
@@ -227,6 +228,9 @@ namespace Murdoku.Characters
         /// <summary>当前格的候选人物（右键清除标记时用于记录快照）。</summary>
         public IReadOnlyList<CharacterData> CandidateMarks => candidateMarks;
 
+        /// <summary>玩家是否主动给该格打了禁用标记（不包含人物放置产生的行列标记）。</summary>
+        public bool PlayerMarked => playerMarked;
+
         private void RebuildCandidateMarkVisual()
         {
             foreach (GameObject chip in candidateMarkChips)
@@ -309,6 +313,7 @@ namespace Murdoku.Characters
                 label.text = character.Initial;
                 label.fontSize = fontSize;
                 label.fontStyle = FontStyles.Bold;
+                label.fontWeight = FontWeight.Bold;
                 label.alignment = TextAlignmentOptions.Center;
                 label.color = character.PlaceholderColor;
                 ApplyCandidateMarkOutline(label);
@@ -328,8 +333,12 @@ namespace Murdoku.Characters
 
             // fontMaterial 会为该文字创建独立材质实例，避免修改共享字体材质影响其他 UI。
             Material material = label.fontMaterial;
+            material.EnableKeyword("OUTLINE_ON");
             material.SetColor(ShaderUtilities.ID_OutlineColor, Color.black);
-            material.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.25f);
+            material.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.38f);
+            material.SetFloat(ShaderUtilities.ID_FaceDilate, 0.08f);
+            label.outlineColor = new Color32(0, 0, 0, 255);
+            label.outlineWidth = 0.38f;
             label.UpdateMeshPadding();
         }
 
@@ -903,7 +912,56 @@ namespace Murdoku.Characters
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            // 某些面板子物体（卡片、滚动区域、装饰图片）会先截获 Drop，导致挂在面板根节点的
+            // IDropHandler 收不到事件。拖拽结束时再按指针位置检测一次面板，作为可靠兜底。
+            CharacterData draggedCharacter = currentCharacter;
+            if (interactionEnabled && draggedCharacter != null && eventData != null && EventSystem.current != null)
+            {
+                List<RaycastResult> hits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(eventData, hits);
+                bool delivered = false;
+                foreach (RaycastResult hit in hits)
+                {
+                    CharacterPanelUI panel = hit.gameObject == null
+                        ? null
+                        : hit.gameObject.GetComponentInParent<CharacterPanelUI>();
+                    if (panel != null)
+                    {
+                        panel.TryReceiveBoardCharacter(draggedCharacter, this);
+                        delivered = true;
+                        break;
+                    }
+                }
+
+                // 面板空白处可能没有可射线 Graphic，再以面板矩形范围补充判断。
+                if (!delivered)
+                {
+                    CharacterPanelUI panel = FindFirstObjectByType<CharacterPanelUI>();
+                    if (panel != null && panel.ContainsScreenPoint(eventData.position, eventData.pressEventCamera))
+                    {
+                        panel.TryReceiveBoardCharacter(draggedCharacter, this);
+                    }
+                }
+            }
+
             CharacterDragPreview.Hide();
+        }
+
+        /// <summary>交互教程目标格：使用更深的蓝色覆盖，并由教程控制器驱动透明度闪烁。</summary>
+        public void SetTutorialHighlight(bool on, float alpha = 0.65f)
+        {
+            Image image = EnsureHighlight(ref tutorialHighlight, new Color(0.04f, 0.25f, 0.95f, 0.65f));
+            if (image == null)
+            {
+                return;
+            }
+
+            image.gameObject.SetActive(on);
+            if (on)
+            {
+                image.color = new Color(0.04f, 0.25f, 0.95f, Mathf.Clamp01(alpha));
+                image.transform.SetAsLastSibling();
+            }
         }
 
         public void OnDrop(PointerEventData eventData)

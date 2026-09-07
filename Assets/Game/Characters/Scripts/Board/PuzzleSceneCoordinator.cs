@@ -36,6 +36,7 @@ namespace Murdoku.Characters
         private TMP_Text popupMessageText;
         private Action popupConfirmAction;
         private RectTransform popupOkRect;
+        private TMP_Text popupOkLabel;
         private Button popupReturnButton;
         private TMP_Text popupReturnLabel;
         private Action popupReturnAction;
@@ -77,6 +78,63 @@ namespace Murdoku.Characters
         private GameObject tutorialPanelRoot;
         private Button tutorialButton;
         private static bool tutorialAutoShownThisSession;
+        private TMP_Text tutorialTitleText;
+        private TMP_Text tutorialBodyText;
+        private TMP_Text tutorialTaskText;
+        private TMP_Text tutorialNextLabel;
+        private Button tutorialNextButton;
+        private Button tutorialBackButton;
+        private CanvasGroup tutorialCanvasGroup;
+        private int tutorialStep;
+        private int tutorialFurthestStep;
+        private bool tutorialActive;
+        private bool tutorialSelectionSubscribed;
+        private bool currentPuzzleIsTutorial;
+        private bool puzzleContentLoaded;
+        private bool puzzleSolved;
+        private bool suppressProgressSave;
+        private bool progressChoicePending;
+        private readonly HashSet<PuzzleBoardCellUI> tutorialHighlightedCells = new HashSet<PuzzleBoardCellUI>();
+
+        private static readonly string[] TutorialBodies =
+        {
+            "欢迎来到 Murdoku。你需要根据每个人的线索安排位置，并找出与受害者同处一个区域的凶手。",
+            "每位人物都有自己的线索。先在左侧嫌疑人面板中找到 Andy，并点击他的人物卡。",
+            "Andy 的线索是“在救生圈里”，棋盘上有两个救生圈。选中 Andy 后，分别单击两个救生圈格，记录候选位置。",
+            "候选会随着调查逐渐排除。再次单击第 3 行第 1 列的救生圈格，取消 Andy 在该格的候选标记。",
+            "Doris 的线索能确定唯一位置。把 Doris 的人物卡拖到左下角的躺椅格；也可以选中她后长按该格。",
+            "每一行、每一列都只能放置一个人。Doris 放下后，她所在行列出现的叉号会提醒你这些格子不能再站人。",
+            "如果操作失误，可以点击“撤销”。现在点击嫌疑人面板上方的“撤销”，取消刚才对 Doris 的放置。",
+            "“恢复”可以重新执行被撤销的操作。点击“恢复”，把 Doris 放回刚才的位置。",
+            "已放置的人物也能直接收回。把棋盘上的 Doris 拖回左侧嫌疑人面板，取消她的放置；也可以在棋盘上右键点击人物将其撤回。",
+            "被拖回面板的人物同样可以恢复。点击“恢复”，将 Doris 放回原来的格子。",
+            "“清空”会移除棋盘上的全部人物和推理标记。现在点击“清空”，体验一次完整重置。",
+            "棋盘已清空。请再次把 Doris 放到左下角的躺椅格，然后继续调查。",
+            "确定某格不可能站人时，可以主动打叉。选择“禁用标记”，然后单击左上角格子。",
+            "粗线围成不同区域。继续结合人物线索、区域名称和道具完成所有人物的位置。",
+            "所有人物都已放置。点击“提交”检查答案；唯一与受害者同处一个区域的嫌疑人就是凶手。",
+            "调查完成！你已经掌握了候选标记、排除格子、放置人物、行列规则和凶手判定。"
+        };
+
+        private static readonly string[] TutorialTasks =
+        {
+            "准备好后点击“开始教程”",
+            "任务：点击 Andy 的人物卡",
+            "任务：在两个救生圈格中都标记 Andy",
+            "任务：再次点击第 3 行第 1 列，取消候选",
+            "任务：把 Doris 放到第 6 行第 1 列",
+            "观察 Doris 所在行列的自动叉号",
+            "任务：点击“撤销”",
+            "任务：点击“恢复”",
+            "任务：把棋盘上的 Doris 拖回左侧面板",
+            "任务：点击“恢复”",
+            "任务：点击“清空”",
+            "任务：再次把 Doris 放到第 6 行第 1 列",
+            "任务：给第 1 行第 1 列主动打叉",
+            "任务：根据线索放置全部 6 名人物",
+            "任务：点击“提交”",
+            "你可以关闭教程，继续挑战其他关卡"
+        };
 
         private sealed class GameAction
         {
@@ -140,6 +198,55 @@ namespace Murdoku.Characters
             StartCoroutine(LoadSelectedPuzzleRoutine());
         }
 
+        private void LateUpdate()
+        {
+            // Canvas 或分辨率适配组件可能在布局阶段重新计算 RectTransform；
+            // 教程显示期间于帧末再次落实避让位置，保证底排目标不会被覆盖。
+            if (tutorialPanelRoot != null && tutorialPanelRoot.activeSelf)
+            {
+                // 某些拖放路径可能早于协调器事件更新；直接读取最终棋盘状态兜底推进步骤。
+                if (tutorialActive && tutorialStep == 4 && TutorialCharacterIsAt("D", 30))
+                {
+                    SetTutorialStep(5);
+                }
+                else if (tutorialActive && tutorialStep == 11 && TutorialCharacterIsAt("D", 30))
+                {
+                    SetTutorialStep(12);
+                }
+
+                UpdateTutorialPanelPlacement();
+                float flashAlpha = Mathf.Lerp(0.38f, 0.82f, (Mathf.Sin(Time.unscaledTime * 5.5f) + 1f) * 0.5f);
+                foreach (PuzzleBoardCellUI cell in tutorialHighlightedCells)
+                {
+                    if (cell != null)
+                    {
+                        cell.SetTutorialHighlight(true, flashAlpha);
+                    }
+                }
+            }
+        }
+
+        private void OnApplicationQuit()
+        {
+            SaveCurrentPlayProgress();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+            {
+                SaveCurrentPlayProgress();
+            }
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused)
+            {
+                SaveCurrentPlayProgress();
+            }
+        }
+
         /// <summary>
         /// 场景脚本重命名、Prefab/Scene 合并或旧场景序列化数据丢失引用时自动恢复依赖。
         /// 关卡载入不能在棋盘引用为空时继续，否则会出现“墙体和文字已载入、棋盘仍是默认 6×6”的半载入状态。
@@ -171,6 +278,13 @@ namespace Murdoku.Characters
         {
             popupConfirmAction = null;
             popupReturnAction = null;
+
+            CharacterPanelUI tutorialPanel = placementController == null ? null : placementController.SelectionSource;
+            if (tutorialSelectionSubscribed && tutorialPanel != null)
+            {
+                tutorialPanel.SelectionChanged -= HandleTutorialSelectionChanged;
+                tutorialSelectionSubscribed = false;
+            }
 
             if (puzzleBoard != null)
             {
@@ -224,6 +338,7 @@ namespace Murdoku.Characters
                     if (playMode)
                     {
                         cellUI.TogglePlayerMark();
+                        EvaluateTutorialCross(cellUI);
                     }
                     else
                     {
@@ -280,6 +395,8 @@ namespace Murdoku.Characters
                     {
                         SetStatus("已取消 " + markedCharacter.DisplayName + " 在 (" + pos.x + "," + pos.y + ") 的候选标记。");
                     }
+
+                    EvaluateTutorialCandidate(markCell, markedCharacter, added);
                 }
 
                 RefreshHighlights();
@@ -316,6 +433,7 @@ namespace Murdoku.Characters
                     if (playMode)
                     {
                         cellUI.TogglePlayerMark();
+                        EvaluateTutorialCross(cellUI);
                     }
                     else
                     {
@@ -347,6 +465,7 @@ namespace Murdoku.Characters
             {
                 // 清除该人物全棋盘候选标记，并给所在行列空格打禁用标记、清除行列其他候选。
                 PushPlacementAction(selected);
+                EvaluateTutorialPlacement(selected, cell);
             }
 
             RefreshHighlights();
@@ -413,6 +532,10 @@ namespace Murdoku.Characters
             pendingReaddCharacter = character;
             RefreshHighlights();
             SetStatus("已将 " + character.DisplayName + " 收回面板（可点「恢复」重新放置）。");
+            if (tutorialActive && tutorialStep == 8 && CharacterIs(character, "D"))
+            {
+                SetTutorialStep(9);
+            }
         }
 
         /// <summary>删除该人物残留在撤销/恢复栈里的放置动作（右键收回后旧记录已失效）。</summary>
@@ -440,6 +563,7 @@ namespace Murdoku.Characters
             if (result == CharacterPlacementResult.Placed || result == CharacterPlacementResult.Moved)
             {
                 PushPlacementAction(character);
+                EvaluateTutorialPlacement(character, cell);
             }
 
             RefreshHighlights();
@@ -656,13 +780,11 @@ namespace Murdoku.Characters
             }
 
             selectedDifficulty = Mathf.Clamp(data.difficulty, 0, DifficultyNames.Length - 1);
+            currentPuzzleIsTutorial = playMode && data.difficulty == 0;
             RefreshDifficultyButtons();
-
-            // 新手教程关卡（难度=教程）首次进入时自动弹出教学卡片；之后可通过右上角 "?" 随时重看。
-            if (playMode && data.difficulty == 0 && !tutorialAutoShownThisSession)
+            if (tutorialButton != null)
             {
-                tutorialAutoShownThisSession = true;
-                ShowTutorial();
+                tutorialButton.gameObject.SetActive(currentPuzzleIsTutorial);
             }
 
             // 恢复全局线索并显示在嫌疑人卡片下方（旧存档无此字段则不显示）。
@@ -755,6 +877,190 @@ namespace Murdoku.Characters
                 "已载入关卡：" + data.name + "（" + data.size + "×" + data.size +
                 "，" + restoredFloorCount + " 格地块，" + restoredPropCount +
                 " 件道具），点击格子标记候选，长按或拖拽人物卡放置，摆完提交。");
+
+            puzzleContentLoaded = true;
+
+            if (playMode && data.difficulty == 0)
+            {
+                SubscribeTutorialSelection();
+                EnsureTutorialButton();
+                if (tutorialButton != null)
+                {
+                    tutorialButton.gameObject.SetActive(true);
+                }
+            }
+
+            PuzzlePlayProgressData previousProgress = playMode
+                ? PuzzlePlayProgress.Load(editingPuzzleId)
+                : null;
+            if (previousProgress != null)
+            {
+                progressChoicePending = true;
+                ShowPopup(
+                    "继续上次推理？",
+                    "检测到这关尚未完成的棋盘记录。选择“确定”恢复上次的人物和标记；选择“重新开始”清空旧记录。",
+                    () =>
+                    {
+                        progressChoicePending = false;
+                        RestorePlayProgress(previousProgress);
+                        ContinueAfterProgressChoice(true);
+                    },
+                    "重新开始",
+                    () =>
+                    {
+                        progressChoicePending = false;
+                        PuzzlePlayProgress.Delete(editingPuzzleId);
+                        ContinueAfterProgressChoice(false);
+                    },
+                    "保留上次推理");
+            }
+            else
+            {
+                ContinueAfterProgressChoice(false);
+            }
+        }
+
+        private void ContinueAfterProgressChoice(bool resumed)
+        {
+            if (resumed)
+            {
+                SetStatus("已恢复上次未完成的推理。撤销与恢复历史已重新开始。", false);
+                return;
+            }
+
+            if (currentPuzzleIsTutorial && !tutorialAutoShownThisSession)
+            {
+                tutorialAutoShownThisSession = true;
+                StartInteractiveTutorial();
+            }
+        }
+
+        private void RestorePlayProgress(PuzzlePlayProgressData progress)
+        {
+            if (progress == null || placementController == null || puzzleBoard == null)
+            {
+                return;
+            }
+
+            placementController.ClearAllPlacements();
+            foreach (PuzzleBoardCellUI cell in puzzleBoard.Cells)
+            {
+                cell?.ClearPlayMarks();
+            }
+
+            if (progress.placements != null)
+            {
+                foreach (PuzzlePlacementData placement in progress.placements)
+                {
+                    if (placement == null || placement.cellIndex < 0 || placement.cellIndex >= puzzleBoard.Cells.Count)
+                    {
+                        continue;
+                    }
+
+                    CharacterData character = placementController.FindCharacterById(placement.characterId);
+                    if (character != null)
+                    {
+                        placementController.TryPlaceCharacterSilently(character, puzzleBoard.Cells[placement.cellIndex]);
+                    }
+                }
+            }
+
+            if (progress.cells != null)
+            {
+                foreach (PuzzleCellProgressData savedCell in progress.cells)
+                {
+                    if (savedCell == null || savedCell.cellIndex < 0 || savedCell.cellIndex >= puzzleBoard.Cells.Count)
+                    {
+                        continue;
+                    }
+
+                    PuzzleBoardCellUI cell = puzzleBoard.Cells[savedCell.cellIndex];
+                    if (savedCell.candidateCharacterIds != null)
+                    {
+                        foreach (string characterId in savedCell.candidateCharacterIds)
+                        {
+                            CharacterData character = placementController.FindCharacterById(characterId);
+                            if (character != null && !cell.HasCandidateMark(character))
+                            {
+                                cell.ToggleCandidateMark(character);
+                            }
+                        }
+                    }
+                    cell.SetPlayerMark(savedCell.playerMarked);
+                }
+            }
+
+            // 自动行列叉号不写入存档，依据恢复后的人物位置重新生成。
+            if (progress.placements != null)
+            {
+                foreach (PuzzlePlacementData placement in progress.placements)
+                {
+                    CharacterData character = placement == null
+                        ? null
+                        : placementController.FindCharacterById(placement.characterId);
+                    if (character != null && placementController.TryGetPlacement(character, out ICharacterPlacementCell cell))
+                    {
+                        puzzleBoard.DisableRowColumnCells(character, cell);
+                        puzzleBoard.ClearOtherMarksInRowColumn(character, cell);
+                    }
+                }
+            }
+
+            placementController.ClearUndoHistory();
+            undoActions.Clear();
+            redoActions.Clear();
+            pendingReaddCell = null;
+            pendingReaddCharacter = null;
+            RefreshHighlights();
+        }
+
+        private void SaveCurrentPlayProgress()
+        {
+            if (!playMode || !puzzleContentLoaded || puzzleSolved || suppressProgressSave || progressChoicePending ||
+                string.IsNullOrEmpty(editingPuzzleId) || placementController == null || puzzleBoard == null)
+            {
+                return;
+            }
+
+            PuzzlePlayProgressData progress = new PuzzlePlayProgressData
+            {
+                puzzleId = editingPuzzleId,
+                placements = placementController.ExportPlacements(puzzleBoard.Columns)
+            };
+
+            for (int index = 0; index < puzzleBoard.Cells.Count; index++)
+            {
+                PuzzleBoardCellUI cell = puzzleBoard.Cells[index];
+                if (cell == null || (!cell.PlayerMarked && cell.CandidateMarks.Count == 0))
+                {
+                    continue;
+                }
+
+                PuzzleCellProgressData savedCell = new PuzzleCellProgressData
+                {
+                    cellIndex = index,
+                    playerMarked = cell.PlayerMarked
+                };
+                foreach (CharacterData character in cell.CandidateMarks)
+                {
+                    if (character != null && !string.IsNullOrEmpty(character.CharacterId))
+                    {
+                        savedCell.candidateCharacterIds.Add(character.CharacterId);
+                    }
+                }
+                progress.cells.Add(savedCell);
+            }
+
+            PuzzlePlayProgress.Save(progress);
+        }
+
+        public void RequestExitFromPuzzle()
+        {
+            SaveCurrentPlayProgress();
+            suppressProgressSave = true;
+            PuzzleSession.SelectedPuzzleId = null;
+            PuzzleSession.EditMode = false;
+            SceneManager.LoadScene(playMode ? "LevelSelectScene" : "MainMenuScene");
         }
 
         /// <summary>
@@ -855,6 +1161,15 @@ namespace Murdoku.Characters
             }
 
             tutorialPanelRoot.SetActive(true);
+            RefreshTutorialPanel();
+        }
+
+        private void StartInteractiveTutorial()
+        {
+            tutorialActive = true;
+            tutorialStep = 0;
+            tutorialFurthestStep = 0;
+            ShowTutorial();
         }
 
         private void CloseTutorial()
@@ -863,6 +1178,15 @@ namespace Murdoku.Characters
             {
                 tutorialPanelRoot.SetActive(false);
             }
+
+            foreach (PuzzleBoardCellUI cell in tutorialHighlightedCells)
+            {
+                if (cell != null)
+                {
+                    cell.SetTutorialHighlight(false);
+                }
+            }
+            tutorialHighlightedCells.Clear();
         }
 
         private void ToggleTutorial()
@@ -870,6 +1194,10 @@ namespace Murdoku.Characters
             if (tutorialPanelRoot != null && tutorialPanelRoot.activeSelf)
             {
                 CloseTutorial();
+            }
+            else if (!tutorialActive && currentPuzzleIsTutorial)
+            {
+                StartInteractiveTutorial();
             }
             else
             {
@@ -916,9 +1244,7 @@ namespace Murdoku.Characters
             tutorialButton = button;
         }
 
-        /// <summary>
-        /// 右上角边缘的新手教程卡片：简要说明标记/放置/行列规则/全局线索/区域与提交。
-        /// </summary>
+        /// <summary>可由实际棋盘操作推进的分步新手教程。</summary>
         private void BuildTutorialPanel()
         {
             Canvas canvas = FindFirstObjectByType<Canvas>();
@@ -930,58 +1256,363 @@ namespace Murdoku.Characters
 
             RectTransform panel = CreateUiObject("TutorialPanel", canvas.transform).GetComponent<RectTransform>();
             tutorialPanelRoot = panel.gameObject;
-            panel.anchorMin = new Vector2(1f, 1f);
-            panel.anchorMax = new Vector2(1f, 1f);
-            panel.pivot = new Vector2(1f, 1f);
-            panel.anchoredPosition = new Vector2(-24f, -160f);
-            panel.sizeDelta = new Vector2(560f, 820f);
+            tutorialCanvasGroup = panel.gameObject.AddComponent<CanvasGroup>();
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.zero;
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            panel.anchoredPosition = new Vector2(710f, 270f);
+            panel.sizeDelta = new Vector2(480f, 300f);
+            panel.localScale = Vector3.one * 1.15f;
 
             Image panelImage = panel.gameObject.AddComponent<Image>();
             UiRoundedSprite.Apply(panelImage, 16);
             panelImage.color = new Color(0.13f, 0.15f, 0.20f, 0.98f);
 
-            TMP_Text title = CreateText("TitleText", panel, font, 48f, FontStyles.Bold);
-            title.text = "新手教程";
-            RectTransform titleRect = title.rectTransform;
+            tutorialTitleText = CreateText("TitleText", panel, font, 30f, FontStyles.Bold);
+            RectTransform titleRect = tutorialTitleText.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 1f);
             titleRect.anchorMax = new Vector2(1f, 1f);
             titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.sizeDelta = new Vector2(0f, 72f);
-            titleRect.anchoredPosition = new Vector2(0f, -16f);
+            titleRect.sizeDelta = new Vector2(-32f, 44f);
+            titleRect.anchoredPosition = new Vector2(0f, -8f);
 
-            TMP_Text body = CreateText("BodyText", panel, font, 36f, FontStyles.Normal);
-            body.text = "<b>1  阅读线索</b>：人物卡上的是个人线索；全局线索对所有人有效。\n"
-                + "<b>2  标记候选</b>：选中人物后单击格子；再次单击即可取消。\n"
-                + "<b>3  放置人物</b>：长按格子，或把人物卡拖到格子上。\n"
-                + "<b>每一行、每一列都只能放置一个人。</b>\n"
-                + "<b>4  找出凶手</b>：与受害者单独同处一个区域的人就是凶手。\n"
-                + "摆放所有人物后，点击  提交  检查答案。";
-            body.alignment = TextAlignmentOptions.TopLeft;
-            body.color = new Color(0.90f, 0.93f, 0.97f, 1f);
-            body.lineSpacing = 0f;
-            RectTransform bodyRect = body.rectTransform;
-            bodyRect.anchorMin = new Vector2(0f, 0f);
+            tutorialBodyText = CreateText("BodyText", panel, font, 23f, FontStyles.Normal);
+            tutorialBodyText.alignment = TextAlignmentOptions.TopLeft;
+            tutorialBodyText.color = new Color(0.90f, 0.93f, 0.97f, 1f);
+            tutorialBodyText.enableWordWrapping = true;
+            RectTransform bodyRect = tutorialBodyText.rectTransform;
+            bodyRect.anchorMin = new Vector2(0f, 1f);
             bodyRect.anchorMax = new Vector2(1f, 1f);
-            bodyRect.offsetMin = new Vector2(24f, 96f);
-            bodyRect.offsetMax = new Vector2(-24f, -96f);
+            bodyRect.pivot = new Vector2(0.5f, 1f);
+            bodyRect.anchoredPosition = new Vector2(0f, -52f);
+            bodyRect.sizeDelta = new Vector2(-32f, 126f);
+
+            tutorialTaskText = CreateText("TaskText", panel, font, 22f, FontStyles.Bold);
+            tutorialTaskText.alignment = TextAlignmentOptions.Left;
+            tutorialTaskText.color = new Color(0.48f, 0.76f, 1f, 1f);
+            RectTransform taskRect = tutorialTaskText.rectTransform;
+            taskRect.anchorMin = new Vector2(0f, 0f);
+            taskRect.anchorMax = new Vector2(1f, 0f);
+            taskRect.pivot = new Vector2(0.5f, 0f);
+            taskRect.anchoredPosition = new Vector2(0f, 62f);
+            taskRect.sizeDelta = new Vector2(-32f, 42f);
 
             RectTransform okRect = CreateUiObject("OkButton", panel).GetComponent<RectTransform>();
-            okRect.anchorMin = new Vector2(0.5f, 0f);
-            okRect.anchorMax = new Vector2(0.5f, 0f);
+            okRect.anchorMin = new Vector2(1f, 0f);
+            okRect.anchorMax = new Vector2(1f, 0f);
             okRect.pivot = new Vector2(0.5f, 0.5f);
-            okRect.sizeDelta = new Vector2(220f, 76f);
-            okRect.anchoredPosition = new Vector2(0f, 18f);
+            okRect.sizeDelta = new Vector2(140f, 50f);
+            okRect.anchoredPosition = new Vector2(-78f, 31f);
             Image okImage = okRect.gameObject.AddComponent<Image>();
             UiRoundedSprite.Apply(okImage, 12);
             okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
-            Button okButton = okRect.gameObject.AddComponent<Button>();
-            okButton.targetGraphic = okImage;
-            okButton.onClick.AddListener(CloseTutorial);
-            UiClickFeedback.Ensure(okButton);
-            TMP_Text okLabel = CreateText("Label", okRect, font, 40f, FontStyles.Bold);
-            okLabel.text = "我知道了";
-            Stretch(okLabel.rectTransform);
-            okLabel.raycastTarget = false;
+            tutorialNextButton = okRect.gameObject.AddComponent<Button>();
+            tutorialNextButton.targetGraphic = okImage;
+            tutorialNextButton.onClick.AddListener(HandleTutorialNext);
+            UiClickFeedback.Ensure(tutorialNextButton);
+            tutorialNextLabel = CreateText("Label", okRect, font, 23f, FontStyles.Bold);
+            Stretch(tutorialNextLabel.rectTransform);
+            tutorialNextLabel.raycastTarget = false;
+
+            tutorialBackButton = CreateTutorialSmallButton(panel, font, "BackButton", "上一步", new Vector2(78f, 31f), HandleTutorialBack);
+            CreateTutorialSmallButton(panel, font, "SkipButton", "跳过", new Vector2(238f, 31f), SkipTutorial);
+            RefreshTutorialPanel();
+        }
+
+        private Button CreateTutorialSmallButton(RectTransform parent, TMP_FontAsset font, string name, string label,
+            Vector2 position, Action callback)
+        {
+            RectTransform rect = CreateUiObject(name, parent).GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(140f, 50f);
+            rect.anchoredPosition = position;
+            Image image = rect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(image, 10);
+            image.color = new Color(0.28f, 0.31f, 0.38f, 1f);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => callback?.Invoke());
+            UiClickFeedback.Ensure(button);
+            TMP_Text text = CreateText("Label", rect, font, 23f, FontStyles.Bold);
+            text.text = label;
+            Stretch(text.rectTransform);
+            text.raycastTarget = false;
+            return button;
+        }
+
+        private void SubscribeTutorialSelection()
+        {
+            CharacterPanelUI panel = placementController == null ? null : placementController.SelectionSource;
+            if (tutorialSelectionSubscribed || panel == null)
+            {
+                return;
+            }
+
+            panel.SelectionChanged += HandleTutorialSelectionChanged;
+            tutorialSelectionSubscribed = true;
+        }
+
+        private void HandleTutorialSelectionChanged(CharacterData character)
+        {
+            if (tutorialActive && tutorialStep == 1 && CharacterIs(character, "A"))
+            {
+                SetTutorialStep(2);
+            }
+        }
+
+        private void HandleTutorialNext()
+        {
+            if (tutorialStep < tutorialFurthestStep)
+            {
+                SetTutorialStep(tutorialStep + 1);
+            }
+            else if (tutorialStep == 0)
+            {
+                SetTutorialStep(1);
+            }
+            else if (tutorialStep == 5)
+            {
+                SetTutorialStep(6);
+            }
+            else if (tutorialStep >= TutorialBodies.Length - 1)
+            {
+                ReturnToLevelSelect();
+            }
+        }
+
+        private void HandleTutorialBack()
+        {
+            if (tutorialStep > 0)
+            {
+                SetTutorialStep(tutorialStep - 1);
+            }
+        }
+
+        private void SkipTutorial()
+        {
+            tutorialActive = false;
+            CloseTutorial();
+            RefreshHighlights();
+            SetStatus("已跳过交互教程，可点击右上角“说明”重新查看。", false);
+        }
+
+        private void SetTutorialStep(int step)
+        {
+            tutorialStep = Mathf.Clamp(step, 0, TutorialBodies.Length - 1);
+            tutorialFurthestStep = Mathf.Max(tutorialFurthestStep, tutorialStep);
+            RefreshTutorialPanel();
+            RefreshHighlights();
+            ApplyTutorialHighlight();
+        }
+
+        private void RefreshTutorialPanel()
+        {
+            if (tutorialTitleText == null || tutorialBodyText == null || tutorialTaskText == null)
+            {
+                return;
+            }
+
+            UpdateTutorialPanelPlacement();
+
+            tutorialTitleText.text = tutorialStep >= TutorialBodies.Length - 1
+                ? "教程完成"
+                : "交互教程  " + (tutorialStep + 1) + " / " + (TutorialBodies.Length - 1);
+            tutorialBodyText.text = TutorialBodies[tutorialStep];
+            tutorialTaskText.text = TutorialTasks[tutorialStep];
+
+            bool reviewing = tutorialStep < tutorialFurthestStep;
+            bool manualNext = reviewing || tutorialStep == 0 || tutorialStep == 5 ||
+                              tutorialStep >= TutorialBodies.Length - 1;
+            tutorialNextButton.interactable = manualNext;
+            tutorialNextLabel.text = tutorialStep == 0 ? "开始教程" :
+                tutorialStep >= TutorialBodies.Length - 1 ? "退出教程" :
+                reviewing ? "下一步" : manualNext ? "我看到了" : "等待操作";
+            tutorialBackButton.interactable = tutorialStep > 0;
+            ApplyTutorialHighlight();
+        }
+
+        /// <summary>
+        /// 教程固定放在嫌疑人第二排卡片右侧的空缺区域、棋盘左边，避免遮挡棋盘。
+        /// </summary>
+        private void UpdateTutorialPanelPlacement()
+        {
+            if (tutorialPanelRoot == null ||
+                !(tutorialPanelRoot.transform is RectTransform panel))
+            {
+                return;
+            }
+
+            if (tutorialCanvasGroup == null)
+            {
+                tutorialCanvasGroup = tutorialPanelRoot.GetComponent<CanvasGroup>() ??
+                                      tutorialPanelRoot.AddComponent<CanvasGroup>();
+            }
+
+            tutorialCanvasGroup.blocksRaycasts = true;
+            tutorialCanvasGroup.interactable = true;
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.zero;
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            panel.anchoredPosition = new Vector2(710f, 270f);
+            panel.sizeDelta = new Vector2(480f, 300f);
+            panel.localScale = Vector3.one * 1.15f;
+        }
+
+        private void EvaluateTutorialCandidate(PuzzleBoardCellUI cell, CharacterData character, bool added)
+        {
+            if (!tutorialActive || !CharacterIs(character, "A") || puzzleBoard == null)
+            {
+                return;
+            }
+
+            if (tutorialStep == 2)
+            {
+                CharacterData andy = placementController.FindCharacterById("A");
+                if (CellHasCandidate(2, andy) && CellHasCandidate(12, andy))
+                {
+                    SetTutorialStep(3);
+                }
+                else
+                {
+                    RefreshTutorialPanel();
+                }
+            }
+            else if (tutorialStep == 3 && CellIndex(cell) == 12 && !added)
+            {
+                SetTutorialStep(4);
+            }
+        }
+
+        private void EvaluateTutorialCross(PuzzleBoardCellUI cell)
+        {
+            if (tutorialActive && tutorialStep == 12 && CellIndex(cell) == 0 && cell.PlayerMarked)
+            {
+                SetTutorialStep(13);
+            }
+        }
+
+        private void EvaluateTutorialPlacement(CharacterData character, ICharacterPlacementCell cell)
+        {
+            if (!tutorialActive)
+            {
+                return;
+            }
+
+            if (tutorialStep == 4 && CharacterIs(character, "D") && CellIndex(cell) == 30)
+            {
+                SetTutorialStep(5);
+                return;
+            }
+
+            if (tutorialStep == 11 && CharacterIs(character, "D") && CellIndex(cell) == 30)
+            {
+                SetTutorialStep(12);
+                return;
+            }
+
+            if (tutorialStep == 13)
+            {
+                if (TutorialPlacementsCorrect())
+                {
+                    SetTutorialStep(14);
+                }
+                else
+                {
+                    RefreshTutorialPanel();
+                }
+            }
+        }
+
+        private bool TutorialPlacementsCorrect()
+        {
+            if (placementController == null)
+            {
+                return false;
+            }
+
+            string[] ids = { "A", "B", "C", "D", "E", "V" };
+            int[] cells = { 2, 10, 27, 30, 23, 13 };
+            for (int index = 0; index < ids.Length; index++)
+            {
+                CharacterData character = placementController.FindCharacterById(ids[index]);
+                if (character == null || !placementController.TryGetPlacement(character, out ICharacterPlacementCell cell) ||
+                    CellIndex(cell) != cells[index])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool TutorialCharacterIsAt(string characterId, int expectedCellIndex)
+        {
+            if (placementController == null)
+            {
+                return false;
+            }
+
+            CharacterData character = placementController.FindCharacterById(characterId);
+            return character != null &&
+                   placementController.TryGetPlacement(character, out ICharacterPlacementCell cell) &&
+                   CellIndex(cell) == expectedCellIndex;
+        }
+
+        private bool CellHasCandidate(int index, CharacterData character)
+        {
+            return puzzleBoard != null && index >= 0 && index < puzzleBoard.Cells.Count &&
+                   puzzleBoard.Cells[index].HasCandidateMark(character);
+        }
+
+        private int CellIndex(ICharacterPlacementCell cell)
+        {
+            return cell == null || puzzleBoard == null
+                ? -1
+                : cell.GridPosition.y * puzzleBoard.Columns + cell.GridPosition.x;
+        }
+
+        private static bool CharacterIs(CharacterData character, string id)
+        {
+            return character != null && string.Equals(character.CharacterId, id, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ApplyTutorialHighlight()
+        {
+            foreach (PuzzleBoardCellUI previous in tutorialHighlightedCells)
+            {
+                if (previous != null)
+                {
+                    previous.SetTutorialHighlight(false);
+                }
+            }
+            tutorialHighlightedCells.Clear();
+
+            if (!tutorialActive || puzzleBoard == null)
+            {
+                return;
+            }
+
+            int[] targets = tutorialStep switch
+            {
+                2 => new[] { 2, 12 },
+                3 => new[] { 12 },
+                4 => new[] { 30 },
+                11 => new[] { 30 },
+                12 => new[] { 0 },
+                _ => Array.Empty<int>()
+            };
+
+            foreach (int index in targets)
+            {
+                if (index >= 0 && index < puzzleBoard.Cells.Count)
+                {
+                    PuzzleBoardCellUI cell = puzzleBoard.Cells[index];
+                    tutorialHighlightedCells.Add(cell);
+                    cell.SetTutorialHighlight(true, 0.72f);
+                }
+            }
         }
 
         private void ShowPopup(
@@ -989,7 +1620,8 @@ namespace Murdoku.Characters
             string message,
             Action onConfirmed = null,
             string returnLabel = null,
-            Action onReturn = null)
+            Action onReturn = null,
+            string confirmLabel = null)
         {
             if (popupRoot == null)
             {
@@ -1015,6 +1647,11 @@ namespace Murdoku.Characters
             if (popupMessageText != null)
             {
                 popupMessageText.text = message;
+            }
+
+            if (popupOkLabel != null)
+            {
+                popupOkLabel.text = string.IsNullOrEmpty(confirmLabel) ? "确定" : confirmLabel;
             }
 
             bool hasReturnButton = !string.IsNullOrEmpty(returnLabel) && popupReturnButton != null;
@@ -1088,6 +1725,7 @@ namespace Murdoku.Characters
             popupOkRect = okRect;
 
             Image okImage = okRect.gameObject.AddComponent<Image>();
+            UiRoundedSprite.Apply(okImage, 16);
             okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
             Button okButton = okRect.gameObject.AddComponent<Button>();
             okButton.targetGraphic = okImage;
@@ -1097,6 +1735,7 @@ namespace Murdoku.Characters
             TMP_Text okLabel = CreateText("Label", okRect, font, 32f, FontStyles.Normal);
             okLabel.text = "确定";
             Stretch(okLabel.rectTransform);
+            popupOkLabel = okLabel;
 
             RectTransform returnRect = CreateUiObject("ReturnButton", panel).GetComponent<RectTransform>();
             returnRect.anchorMin = new Vector2(0.5f, 0f);
@@ -1106,7 +1745,7 @@ namespace Murdoku.Characters
             returnRect.anchoredPosition = new Vector2(-170f, 29f);
 
             Image returnImage = returnRect.gameObject.AddComponent<Image>();
-            UiRoundedSprite.Apply(returnImage, 12);
+            UiRoundedSprite.Apply(returnImage, 16);
             returnImage.color = new Color(0.30f, 0.62f, 0.42f, 1f);
             popupReturnButton = returnRect.gameObject.AddComponent<Button>();
             popupReturnButton.targetGraphic = returnImage;
@@ -1174,8 +1813,9 @@ namespace Murdoku.Characters
             returnAction?.Invoke();
         }
 
-        private static void ReturnToLevelSelect()
+        private void ReturnToLevelSelect()
         {
+            suppressProgressSave = true;
             PuzzleSession.SelectedPuzzleId = null;
             PuzzleSession.EditMode = false;
             SceneManager.LoadScene("LevelSelectScene");
@@ -1187,6 +1827,8 @@ namespace Murdoku.Characters
             {
                 puzzleBoard.RefreshRowColumnHighlights();
             }
+
+            ApplyTutorialHighlight();
         }
 
         private void EnsureGameplayButtons()
@@ -2383,6 +3025,11 @@ namespace Murdoku.Characters
             redoActions.Add(action);
             RefreshHighlights();
             SetStatus("已撤销上一步操作。");
+            if (tutorialActive && tutorialStep == 6 && action.IsPlacement &&
+                CharacterIs(action.MarkCharacter, "D"))
+            {
+                SetTutorialStep(7);
+            }
         }
 
         /// <summary>
@@ -2413,6 +3060,10 @@ namespace Murdoku.Characters
                 SetStatus(placed
                     ? "已恢复：将 " + (readdCharacter == null ? "人物" : readdCharacter.DisplayName) + " 放回原格。"
                     : "无法恢复放置：目标格当前不可用。", !placed);
+                if (placed && tutorialActive && tutorialStep == 9 && CharacterIs(readdCharacter, "D"))
+                {
+                    SetTutorialStep(10);
+                }
                 return;
             }
 
@@ -2462,6 +3113,11 @@ namespace Murdoku.Characters
             undoActions.Add(action);
             RefreshHighlights();
             SetStatus("已恢复上一步操作。");
+            if (tutorialActive && tutorialStep == 7 && action.IsPlacement &&
+                CharacterIs(action.MarkCharacter, "D"))
+            {
+                SetTutorialStep(8);
+            }
         }
 
         /// <summary>清空游玩棋盘上的全部人物和玩家推理标记。</summary>
@@ -2500,6 +3156,10 @@ namespace Murdoku.Characters
             pendingReaddCell = null;
             pendingReaddCharacter = null;
             SetStatus("已清空棋盘上的人物和标记。");
+            if (tutorialActive && tutorialStep == 10)
+            {
+                SetTutorialStep(11);
+            }
         }
 
         private void SubmitPuzzle()
@@ -2631,12 +3291,26 @@ namespace Murdoku.Characters
             if (roomMates.Count == 1)
             {
                 GameAudio.Play(SfxCue.CaseSolved);
+                puzzleSolved = true;
+                suppressProgressSave = true;
+                PuzzlePlayProgress.Delete(editingPuzzleId);
+                Murdoku.PuzzleProgress.MarkSolved(editingPuzzleId);
+                if (tutorialActive && tutorialStep == 14)
+                {
+                    SetTutorialStep(15);
+                }
+                if (currentPuzzleIsTutorial)
+                {
+                    SetStatus("教程完成！凶手是 " + roomMates[0].DisplayName + "。", false);
+                    return;
+                }
                 ShowPopup(
                     "破案成功！",
                     "凶手是 " + roomMates[0].DisplayName + "：TA 与受害者同处一室且身边没有其他人。",
                     null,
-                    "继续游戏",
-                    ReturnToLevelSelect);
+                    "返回列表",
+                    ReturnToLevelSelect,
+                    "留在关卡");
                 SetStatus("破案成功！凶手是 " + roomMates[0].DisplayName + "。", false);
                 return;
             }

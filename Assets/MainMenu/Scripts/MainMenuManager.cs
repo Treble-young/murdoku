@@ -14,7 +14,6 @@ public class MainMenuManager : MonoBehaviour
         "期待你的来信，更期待与你并肩同行！";
 
     [Header("拖拽绑定")]
-    public GameObject instructionPanel;
     public GameObject maskBlack;    // 把遮罩面板拖进这个槽
     [SerializeField] private TMP_FontAsset feedbackFont;
 
@@ -22,8 +21,10 @@ public class MainMenuManager : MonoBehaviour
 
     void Start()
     {
-        instructionPanel.SetActive(false);
-        maskBlack.SetActive(false);
+        if (maskBlack != null)
+        {
+            maskBlack.SetActive(false);
+        }
         DisableMainMenuButtonWrapping();
         CreateFeedbackButton();
         CreateFeedbackPanel();
@@ -44,20 +45,6 @@ public class MainMenuManager : MonoBehaviour
         }
     }
 
-    // 打开教程：同时显示遮罩+弹窗
-    public void OpenInstruction()
-    {
-        maskBlack.SetActive(true);
-        instructionPanel.SetActive(true);
-    }
-
-    // 关闭教程：同时隐藏遮罩+弹窗
-    public void CloseInstruction()
-    {
-        maskBlack.SetActive(false);
-        instructionPanel.SetActive(false);
-    }
-
     public void OpenFeedback()
     {
         if (feedbackPanel == null)
@@ -65,7 +52,10 @@ public class MainMenuManager : MonoBehaviour
             return;
         }
 
-        maskBlack.SetActive(true);
+        if (maskBlack != null)
+        {
+            maskBlack.SetActive(true);
+        }
         feedbackPanel.SetActive(true);
         feedbackPanel.transform.SetAsLastSibling();
     }
@@ -78,7 +68,10 @@ public class MainMenuManager : MonoBehaviour
         }
 
         feedbackPanel.SetActive(false);
-        maskBlack.SetActive(false);
+        if (maskBlack != null)
+        {
+            maskBlack.SetActive(false);
+        }
     }
 
     private void CreateFeedbackButton()
@@ -133,7 +126,7 @@ public class MainMenuManager : MonoBehaviour
         panelImage.color = new Color(0.85f, 0.87f, 0.90f, 1f);
         Murdoku.UiRoundedSprite.Apply(panelImage, 20);
 
-        TMP_Text referenceText = instructionPanel.GetComponentInChildren<TMP_Text>(true);
+        TMP_Text referenceText = canvas.GetComponentInChildren<TMP_Text>(true);
         TMP_Text title = CreateText("Title", feedbackPanel.transform, referenceText);
         title.text = "内容反馈";
         title.color = new Color(0.12f, 0.12f, 0.12f, 1f);

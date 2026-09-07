@@ -1,4 +1,5 @@
 using Murdoku;
+using Murdoku.Characters;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -16,6 +17,13 @@ public class SceneSwitch : MonoBehaviour
     // 出题/编辑模式返回主菜单；游玩模式返回谜题列表。
     public void BackToMenu()
     {
+        PuzzleSceneCoordinator coordinator = FindFirstObjectByType<PuzzleSceneCoordinator>();
+        if (coordinator != null)
+        {
+            coordinator.RequestExitFromPuzzle();
+            return;
+        }
+
         string targetScene = ResolveBackTargetScene(
             PuzzleSession.SelectedPuzzleId,
             PuzzleSession.EditMode);

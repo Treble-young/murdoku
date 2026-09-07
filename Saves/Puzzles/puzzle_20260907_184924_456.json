@@ -1,0 +1,273 @@
+{
+    "id": "puzzle_20260907_184924_456",
+    "name": "诊所",
+    "size": 6,
+    "horizontalWalls": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+    ],
+    "verticalWalls": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+    ],
+    "floorTiles": [
+        3,
+        3,
+        3,
+        19,
+        19,
+        19,
+        3,
+        3,
+        3,
+        19,
+        19,
+        19,
+        18,
+        18,
+        18,
+        19,
+        19,
+        19,
+        18,
+        18,
+        18,
+        18,
+        5,
+        5,
+        18,
+        18,
+        18,
+        18,
+        5,
+        5,
+        18,
+        18,
+        18,
+        18,
+        5,
+        5
+    ],
+    "props": [
+        1,
+        12,
+        -1,
+        -1,
+        2,
+        0,
+        3,
+        -1,
+        -1,
+        -1,
+        5,
+        3,
+        -1,
+        -1,
+        23,
+        -1,
+        -1,
+        -1,
+        23,
+        -1,
+        -1,
+        23,
+        -1,
+        -1,
+        23,
+        -1,
+        -1,
+        -1,
+        5,
+        -1,
+        3,
+        23,
+        23,
+        -1,
+        5,
+        -1
+    ],
+    "forbiddenCells": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false
+    ],
+    "regionNames": [
+        "病房",
+        "诊室",
+        "候诊大厅",
+        "药房"
+    ],
+    "regionNameOffsets": [
+        {
+            "x": 0.0,
+            "y": -100.0
+        },
+        {
+            "x": -130.0,
+            "y": 0.0
+        },
+        {
+            "x": 30.0,
+            "y": 0.0
+        },
+        {
+            "x": 0.0,
+            "y": 120.0
+        }
+    ],
+    "placements": [
+        {
+            "characterId": "B",
+            "cellIndex": 8
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 24
+        },
+        {
+            "characterId": "A",
+            "cellIndex": 21
+        },
+        {
+            "characterId": "E",
+            "cellIndex": 35
+        },
+        {
+            "characterId": "C",
+            "cellIndex": 16
+        },
+        {
+            "characterId": "V",
+            "cellIndex": 1
+        }
+    ],
+    "clues": [
+        {
+            "characterId": "A",
+            "clue": "坐在候诊大厅的椅子上",
+            "name": "Alice",
+            "gender": 2
+        },
+        {
+            "characterId": "B",
+            "clue": "在病房，且病床上有人",
+            "name": "Betty",
+            "gender": 2
+        },
+        {
+            "characterId": "C",
+            "clue": "在诊室",
+            "name": "Cathy",
+            "gender": 2
+        },
+        {
+            "characterId": "D",
+            "clue": "在盆栽旁边",
+            "name": "Duke",
+            "gender": 1
+        },
+        {
+            "characterId": "E",
+            "clue": "在药房",
+            "name": "Eddie",
+            "gender": 1
+        },
+        {
+            "characterId": "V",
+            "clue": "受害者，和凶手在同一个区域",
+            "name": "Victim",
+            "gender": 1
+        }
+    ],
+    "difficulty": 1,
+    "globalClue": "“旁边”指的是相邻4格，且处在同一个区域"
+}

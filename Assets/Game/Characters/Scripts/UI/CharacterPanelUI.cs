@@ -53,10 +53,30 @@ namespace Murdoku.Characters
 
             PuzzleBoardCellUI sourceCell = eventData.pointerDrag.GetComponentInParent<PuzzleBoardCellUI>();
             CharacterData character = sourceCell == null ? null : sourceCell.CurrentCharacter;
-            if (character != null)
+            TryReceiveBoardCharacter(character, sourceCell);
+        }
+
+        /// <summary>
+        /// 接收从棋盘拖回的人物。除标准 OnDrop 外，棋盘格会在拖拽结束时调用此方法作为兜底，
+        /// 兼容 ScrollRect、子级图片等对象抢占射线而导致面板收不到 OnDrop 的情况。
+        /// </summary>
+        public bool TryReceiveBoardCharacter(CharacterData character, ICharacterPlacementCell sourceCell)
+        {
+            if (character == null || sourceCell == null)
             {
-                CharacterReturnRequested?.Invoke(character, sourceCell);
+                return false;
             }
+
+            CharacterReturnRequested?.Invoke(character, sourceCell);
+            return true;
+        }
+
+        /// <summary>判断屏幕坐标是否落在真正显示的嫌疑人面板内（脚本对象本身不在 UI 层级中）。</summary>
+        public bool ContainsScreenPoint(Vector2 screenPoint, Camera eventCamera)
+        {
+            RectTransform target = view == null ? null : view.transform as RectTransform;
+            return target != null && target.gameObject.activeInHierarchy &&
+                   RectTransformUtility.RectangleContainsScreenPoint(target, screenPoint, eventCamera);
         }
 
         /// <summary>

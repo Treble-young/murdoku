@@ -492,6 +492,17 @@ namespace Murdoku
                 if (label != null)
                 {
                     label.text = puzzle.name + "（" + puzzle.size + "x" + puzzle.size + "）";
+                    RectTransform labelRect = label.rectTransform;
+                    labelRect.anchorMin = new Vector2(0f, 1f);
+                    labelRect.anchorMax = new Vector2(1f, 1f);
+                    labelRect.pivot = new Vector2(0.5f, 1f);
+                    labelRect.anchoredPosition = new Vector2(-36f, -8f);
+                    labelRect.sizeDelta = new Vector2(-100f, 58f);
+                }
+
+                if (PuzzleProgress.IsSolved(puzzle.id))
+                {
+                    AddSolvedBadge(item, label);
                 }
 
                 Button enterButton = item.GetComponent<Button>();
@@ -522,6 +533,43 @@ namespace Murdoku
             }
         }
 
+        private static void AddSolvedBadge(GameObject item, TMP_Text referenceText)
+        {
+            GameObject badge = new GameObject("SolvedBadge", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            badge.layer = LayerMask.NameToLayer("UI");
+            RectTransform badgeRect = (RectTransform)badge.transform;
+            badgeRect.SetParent(item.transform, false);
+            badgeRect.anchorMin = new Vector2(0.5f, 1f);
+            badgeRect.anchorMax = new Vector2(0.5f, 1f);
+            badgeRect.pivot = new Vector2(0.5f, 1f);
+            badgeRect.anchoredPosition = new Vector2(-22f, -76f);
+            badgeRect.sizeDelta = new Vector2(270f, 32f);
+
+            Image background = badge.GetComponent<Image>();
+            background.color = new Color(0.18f, 0.66f, 0.35f, 1f);
+            background.sprite = CreateRoundedRectSprite(64, 10);
+            background.type = Image.Type.Sliced;
+            background.raycastTarget = false;
+
+            GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.layer = LayerMask.NameToLayer("UI");
+            RectTransform textRect = (RectTransform)textObject.transform;
+            textRect.SetParent(badgeRect, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            TMP_Text text = textObject.GetComponent<TextMeshProUGUI>();
+            text.font = referenceText == null ? null : referenceText.font;
+            text.text = "案件已破";
+            text.fontSize = 21f;
+            text.fontStyle = FontStyles.Bold;
+            text.color = Color.white;
+            text.alignment = TextAlignmentOptions.Center;
+            text.raycastTarget = false;
+        }
+
         private void SetupDeleteButton(Button deleteButton, PuzzleData puzzle)
         {
             TMP_Text deleteLabel = deleteButton.GetComponentInChildren<TMP_Text>();
@@ -547,6 +595,8 @@ namespace Murdoku
                 }
 
                 int pageBefore = currentPage;
+                PuzzleProgress.ClearSolved(puzzle.id);
+                PuzzlePlayProgress.Delete(puzzle.id);
                 PuzzleSaveManager.DeletePuzzle(puzzle.id);
                 RefreshList(pageBefore);
             });
