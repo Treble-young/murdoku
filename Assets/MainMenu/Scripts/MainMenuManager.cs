@@ -35,6 +35,7 @@ public class MainMenuManager : MonoBehaviour
     private static void ScaleMainMenuUi()
     {
         const float scale = 0.9f;
+        const float horizontalOffset = 60f;
         string[] rootNames = { "gametitle", "menu panel" };
         foreach (string rootName in rootNames)
         {
@@ -42,6 +43,11 @@ public class MainMenuManager : MonoBehaviour
             if (root != null)
             {
                 root.transform.localScale = Vector3.one * scale;
+                RectTransform rect = root.GetComponent<RectTransform>();
+                if (rect != null)
+                {
+                    rect.anchoredPosition += Vector2.right * horizontalOffset;
+                }
             }
         }
     }

@@ -302,7 +302,7 @@
         -1,
         -1,
         -1,
-        9,
+        -1,
         -1,
         -1,
         -1,
@@ -404,7 +404,7 @@
         false,
         false,
         false,
-        true,
+        false,
         false,
         false,
         false,
@@ -528,16 +528,16 @@
     ],
     "placements": [
         {
-            "characterId": "G",
-            "cellIndex": 49
-        },
-        {
             "characterId": "A",
             "cellIndex": 90
         },
         {
             "characterId": "E",
             "cellIndex": 23
+        },
+        {
+            "characterId": "G",
+            "cellIndex": 49
         },
         {
             "characterId": "V",
@@ -548,36 +548,36 @@
             "cellIndex": 32
         },
         {
-            "characterId": "C",
-            "cellIndex": 15
-        },
-        {
-            "characterId": "H",
-            "cellIndex": 4
-        },
-        {
             "characterId": "I",
             "cellIndex": 87
         },
         {
-            "characterId": "B",
+            "characterId": "F",
+            "cellIndex": 68
+        },
+        {
+            "characterId": "H",
             "cellIndex": 76
         },
         {
-            "characterId": "F",
-            "cellIndex": 68
+            "characterId": "C",
+            "cellIndex": 15
+        },
+        {
+            "characterId": "B",
+            "cellIndex": 4
         }
     ],
     "clues": [
         {
             "characterId": "A",
-            "clue": "坐在图书室里，  还有一名老师也在这个区域",
+            "clue": "坐在图书室里 ，有一名老师也在这个区域",
             "name": "Amy",
             "gender": 2
         },
         {
             "characterId": "B",
-            "clue": "坐在座位上  ，还有一名老师也在这个区域",
+            "clue": "坐在座位上  ，有一名老师也在这个区域",
             "name": "Bella",
             "gender": 2
         },
@@ -631,5 +631,5 @@
         }
     ],
     "difficulty": 4,
-    "globalClue": "A到G都是学生，其余都是老师，每个区域至少有一个学生，并且没有人在树旁边"
+    "globalClue": "A到G都是学生，H到V都是老师，每个区域至少有一个学生，并且没有人在树旁边"
 }
