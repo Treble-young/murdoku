@@ -100,6 +100,7 @@ namespace Murdoku.Characters
         {
             "欢迎来到 Murdoku。你需要根据每个人的线索安排位置，并找出与受害者同处一个区域的凶手。",
             "每位人物都有自己的线索。先在左侧嫌疑人面板中找到 Andy，并点击他的人物卡。",
+            "除了人物各自的线索，还要留意人物面板下方的“全局线索”。它会对整张棋盘上的所有人物和区域生效；本教程关卡没有额外的全局限制。",
             "Andy 的线索是“在救生圈里”，棋盘上有两个救生圈。选中 Andy 后，分别单击两个救生圈格，记录候选位置。",
             "候选会随着调查逐渐排除。再次单击第 3 行第 1 列的救生圈格，取消 Andy 在该格的候选标记。",
             "Doris 的线索能确定唯一位置。把 Doris 的人物卡拖到左下角的躺椅格；也可以选中她后长按该格。",
@@ -120,6 +121,7 @@ namespace Murdoku.Characters
         {
             "准备好后点击“开始教程”",
             "任务：点击 Andy 的人物卡",
+            "请查看人物面板下方的全局线索，然后点击“我看到了”",
             "任务：在两个救生圈格中都标记 Andy",
             "任务：再次点击第 3 行第 1 列，取消候选",
             "任务：把 Doris 放到第 6 行第 1 列",
@@ -205,13 +207,13 @@ namespace Murdoku.Characters
             if (tutorialPanelRoot != null && tutorialPanelRoot.activeSelf)
             {
                 // 某些拖放路径可能早于协调器事件更新；直接读取最终棋盘状态兜底推进步骤。
-                if (tutorialActive && tutorialStep == 4 && TutorialCharacterIsAt("D", 30))
+                if (tutorialActive && tutorialStep == 5 && TutorialCharacterIsAt("D", 30))
                 {
-                    SetTutorialStep(5);
+                    SetTutorialStep(6);
                 }
-                else if (tutorialActive && tutorialStep == 11 && TutorialCharacterIsAt("D", 30))
+                else if (tutorialActive && tutorialStep == 12 && TutorialCharacterIsAt("D", 30))
                 {
-                    SetTutorialStep(12);
+                    SetTutorialStep(13);
                 }
 
                 UpdateTutorialPanelPlacement();
@@ -223,6 +225,7 @@ namespace Murdoku.Characters
                         cell.SetTutorialHighlight(true, flashAlpha);
                     }
                 }
+                UpdateGlobalClueTutorialHighlight();
             }
         }
 
@@ -532,9 +535,9 @@ namespace Murdoku.Characters
             pendingReaddCharacter = character;
             RefreshHighlights();
             SetStatus("已将 " + character.DisplayName + " 收回面板（可点「恢复」重新放置）。");
-            if (tutorialActive && tutorialStep == 8 && CharacterIs(character, "D"))
+            if (tutorialActive && tutorialStep == 9 && CharacterIs(character, "D"))
             {
-                SetTutorialStep(9);
+                SetTutorialStep(10);
             }
         }
 
@@ -1187,6 +1190,52 @@ namespace Murdoku.Characters
                 }
             }
             tutorialHighlightedCells.Clear();
+            ResetGlobalClueTutorialHighlight();
+        }
+
+        private void UpdateGlobalClueTutorialHighlight()
+        {
+            CharacterPanelUI characterPanel = placementController == null ? null : placementController.SelectionSource;
+            RectTransform clueRoot = characterPanel == null ? null : characterPanel.GlobalClueRoot;
+            if (clueRoot == null)
+            {
+                return;
+            }
+
+            Image background = clueRoot.GetComponent<Image>();
+            if (tutorialActive && tutorialStep == 2)
+            {
+                float pulse = (Mathf.Sin(Time.unscaledTime * 5f) + 1f) * 0.5f;
+                clueRoot.localScale = Vector3.one * Mathf.Lerp(1.02f, 1.08f, pulse);
+                if (background != null)
+                {
+                    background.color = Color.Lerp(
+                        new Color(0.10f, 0.24f, 0.48f, 0.96f),
+                        new Color(0.08f, 0.48f, 0.95f, 1f),
+                        pulse);
+                }
+            }
+            else
+            {
+                ResetGlobalClueTutorialHighlight();
+            }
+        }
+
+        private void ResetGlobalClueTutorialHighlight()
+        {
+            CharacterPanelUI characterPanel = placementController == null ? null : placementController.SelectionSource;
+            RectTransform clueRoot = characterPanel == null ? null : characterPanel.GlobalClueRoot;
+            if (clueRoot == null)
+            {
+                return;
+            }
+
+            clueRoot.localScale = Vector3.one;
+            Image background = clueRoot.GetComponent<Image>();
+            if (background != null)
+            {
+                background.color = new Color(0.13f, 0.15f, 0.20f, 0.92f);
+            }
         }
 
         private void ToggleTutorial()
@@ -1260,8 +1309,8 @@ namespace Murdoku.Characters
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.zero;
             panel.pivot = new Vector2(0.5f, 0.5f);
-            panel.anchoredPosition = new Vector2(710f, 270f);
-            panel.sizeDelta = new Vector2(480f, 300f);
+            panel.anchoredPosition = new Vector2(710f, 320f);
+            panel.sizeDelta = new Vector2(480f, 250f);
             panel.localScale = Vector3.one * 1.15f;
 
             Image panelImage = panel.gameObject.AddComponent<Image>();
@@ -1276,7 +1325,7 @@ namespace Murdoku.Characters
             titleRect.sizeDelta = new Vector2(-32f, 44f);
             titleRect.anchoredPosition = new Vector2(0f, -8f);
 
-            tutorialBodyText = CreateText("BodyText", panel, font, 23f, FontStyles.Normal);
+            tutorialBodyText = CreateText("BodyText", panel, font, 21f, FontStyles.Normal);
             tutorialBodyText.alignment = TextAlignmentOptions.TopLeft;
             tutorialBodyText.color = new Color(0.90f, 0.93f, 0.97f, 1f);
             tutorialBodyText.enableWordWrapping = true;
@@ -1285,7 +1334,7 @@ namespace Murdoku.Characters
             bodyRect.anchorMax = new Vector2(1f, 1f);
             bodyRect.pivot = new Vector2(0.5f, 1f);
             bodyRect.anchoredPosition = new Vector2(0f, -52f);
-            bodyRect.sizeDelta = new Vector2(-32f, 126f);
+            bodyRect.sizeDelta = new Vector2(-32f, 110f);
 
             tutorialTaskText = CreateText("TaskText", panel, font, 22f, FontStyles.Bold);
             tutorialTaskText.alignment = TextAlignmentOptions.Left;
@@ -1294,7 +1343,7 @@ namespace Murdoku.Characters
             taskRect.anchorMin = new Vector2(0f, 0f);
             taskRect.anchorMax = new Vector2(1f, 0f);
             taskRect.pivot = new Vector2(0.5f, 0f);
-            taskRect.anchoredPosition = new Vector2(0f, 62f);
+            taskRect.anchoredPosition = new Vector2(0f, 75f);
             taskRect.sizeDelta = new Vector2(-32f, 42f);
 
             RectTransform okRect = CreateUiObject("OkButton", panel).GetComponent<RectTransform>();
@@ -1302,7 +1351,7 @@ namespace Murdoku.Characters
             okRect.anchorMax = new Vector2(1f, 0f);
             okRect.pivot = new Vector2(0.5f, 0.5f);
             okRect.sizeDelta = new Vector2(140f, 50f);
-            okRect.anchoredPosition = new Vector2(-78f, 31f);
+            okRect.anchoredPosition = new Vector2(-78f, 28f);
             Image okImage = okRect.gameObject.AddComponent<Image>();
             UiRoundedSprite.Apply(okImage, 12);
             okImage.color = new Color(0.22f, 0.48f, 0.86f, 1f);
@@ -1314,8 +1363,8 @@ namespace Murdoku.Characters
             Stretch(tutorialNextLabel.rectTransform);
             tutorialNextLabel.raycastTarget = false;
 
-            tutorialBackButton = CreateTutorialSmallButton(panel, font, "BackButton", "上一步", new Vector2(78f, 31f), HandleTutorialBack);
-            CreateTutorialSmallButton(panel, font, "SkipButton", "跳过", new Vector2(238f, 31f), SkipTutorial);
+            tutorialBackButton = CreateTutorialSmallButton(panel, font, "BackButton", "上一步", new Vector2(78f, 28f), HandleTutorialBack);
+            CreateTutorialSmallButton(panel, font, "SkipButton", "跳过", new Vector2(238f, 28f), SkipTutorial);
             RefreshTutorialPanel();
         }
 
@@ -1372,9 +1421,13 @@ namespace Murdoku.Characters
             {
                 SetTutorialStep(1);
             }
-            else if (tutorialStep == 5)
+            else if (tutorialStep == 2)
             {
-                SetTutorialStep(6);
+                SetTutorialStep(3);
+            }
+            else if (tutorialStep == 6)
+            {
+                SetTutorialStep(7);
             }
             else if (tutorialStep >= TutorialBodies.Length - 1)
             {
@@ -1423,7 +1476,7 @@ namespace Murdoku.Characters
             tutorialTaskText.text = TutorialTasks[tutorialStep];
 
             bool reviewing = tutorialStep < tutorialFurthestStep;
-            bool manualNext = reviewing || tutorialStep == 0 || tutorialStep == 5 ||
+            bool manualNext = reviewing || tutorialStep == 0 || tutorialStep == 2 || tutorialStep == 6 ||
                               tutorialStep >= TutorialBodies.Length - 1;
             tutorialNextButton.interactable = manualNext;
             tutorialNextLabel.text = tutorialStep == 0 ? "开始教程" :
@@ -1455,8 +1508,8 @@ namespace Murdoku.Characters
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.zero;
             panel.pivot = new Vector2(0.5f, 0.5f);
-            panel.anchoredPosition = new Vector2(710f, 270f);
-            panel.sizeDelta = new Vector2(480f, 300f);
+            panel.anchoredPosition = new Vector2(710f, 320f);
+            panel.sizeDelta = new Vector2(480f, 250f);
             panel.localScale = Vector3.one * 1.15f;
         }
 
@@ -1467,29 +1520,29 @@ namespace Murdoku.Characters
                 return;
             }
 
-            if (tutorialStep == 2)
+            if (tutorialStep == 3)
             {
                 CharacterData andy = placementController.FindCharacterById("A");
                 if (CellHasCandidate(2, andy) && CellHasCandidate(12, andy))
                 {
-                    SetTutorialStep(3);
+                    SetTutorialStep(4);
                 }
                 else
                 {
                     RefreshTutorialPanel();
                 }
             }
-            else if (tutorialStep == 3 && CellIndex(cell) == 12 && !added)
+            else if (tutorialStep == 4 && CellIndex(cell) == 12 && !added)
             {
-                SetTutorialStep(4);
+                SetTutorialStep(5);
             }
         }
 
         private void EvaluateTutorialCross(PuzzleBoardCellUI cell)
         {
-            if (tutorialActive && tutorialStep == 12 && CellIndex(cell) == 0 && cell.PlayerMarked)
+            if (tutorialActive && tutorialStep == 13 && CellIndex(cell) == 0 && cell.PlayerMarked)
             {
-                SetTutorialStep(13);
+                SetTutorialStep(14);
             }
         }
 
@@ -1500,23 +1553,23 @@ namespace Murdoku.Characters
                 return;
             }
 
-            if (tutorialStep == 4 && CharacterIs(character, "D") && CellIndex(cell) == 30)
+            if (tutorialStep == 5 && CharacterIs(character, "D") && CellIndex(cell) == 30)
             {
-                SetTutorialStep(5);
+                SetTutorialStep(6);
                 return;
             }
 
-            if (tutorialStep == 11 && CharacterIs(character, "D") && CellIndex(cell) == 30)
+            if (tutorialStep == 12 && CharacterIs(character, "D") && CellIndex(cell) == 30)
             {
-                SetTutorialStep(12);
+                SetTutorialStep(13);
                 return;
             }
 
-            if (tutorialStep == 13)
+            if (tutorialStep == 14)
             {
                 if (TutorialPlacementsCorrect())
                 {
-                    SetTutorialStep(14);
+                    SetTutorialStep(15);
                 }
                 else
                 {
@@ -1596,11 +1649,11 @@ namespace Murdoku.Characters
 
             int[] targets = tutorialStep switch
             {
-                2 => new[] { 2, 12 },
-                3 => new[] { 12 },
-                4 => new[] { 30 },
-                11 => new[] { 30 },
-                12 => new[] { 0 },
+                3 => new[] { 2, 12 },
+                4 => new[] { 12 },
+                5 => new[] { 30 },
+                12 => new[] { 30 },
+                13 => new[] { 0 },
                 _ => Array.Empty<int>()
             };
 
@@ -3025,10 +3078,10 @@ namespace Murdoku.Characters
             redoActions.Add(action);
             RefreshHighlights();
             SetStatus("已撤销上一步操作。");
-            if (tutorialActive && tutorialStep == 6 && action.IsPlacement &&
+            if (tutorialActive && tutorialStep == 7 && action.IsPlacement &&
                 CharacterIs(action.MarkCharacter, "D"))
             {
-                SetTutorialStep(7);
+                SetTutorialStep(8);
             }
         }
 
@@ -3060,9 +3113,9 @@ namespace Murdoku.Characters
                 SetStatus(placed
                     ? "已恢复：将 " + (readdCharacter == null ? "人物" : readdCharacter.DisplayName) + " 放回原格。"
                     : "无法恢复放置：目标格当前不可用。", !placed);
-                if (placed && tutorialActive && tutorialStep == 9 && CharacterIs(readdCharacter, "D"))
+                if (placed && tutorialActive && tutorialStep == 10 && CharacterIs(readdCharacter, "D"))
                 {
-                    SetTutorialStep(10);
+                    SetTutorialStep(11);
                 }
                 return;
             }
@@ -3113,10 +3166,10 @@ namespace Murdoku.Characters
             undoActions.Add(action);
             RefreshHighlights();
             SetStatus("已恢复上一步操作。");
-            if (tutorialActive && tutorialStep == 7 && action.IsPlacement &&
+            if (tutorialActive && tutorialStep == 8 && action.IsPlacement &&
                 CharacterIs(action.MarkCharacter, "D"))
             {
-                SetTutorialStep(8);
+                SetTutorialStep(9);
             }
         }
 
@@ -3156,9 +3209,9 @@ namespace Murdoku.Characters
             pendingReaddCell = null;
             pendingReaddCharacter = null;
             SetStatus("已清空棋盘上的人物和标记。");
-            if (tutorialActive && tutorialStep == 10)
+            if (tutorialActive && tutorialStep == 11)
             {
-                SetTutorialStep(11);
+                SetTutorialStep(12);
             }
         }
 
@@ -3295,9 +3348,9 @@ namespace Murdoku.Characters
                 suppressProgressSave = true;
                 PuzzlePlayProgress.Delete(editingPuzzleId);
                 Murdoku.PuzzleProgress.MarkSolved(editingPuzzleId);
-                if (tutorialActive && tutorialStep == 14)
+                if (tutorialActive && tutorialStep == 15)
                 {
-                    SetTutorialStep(15);
+                    SetTutorialStep(16);
                 }
                 if (currentPuzzleIsTutorial)
                 {

@@ -25,9 +25,25 @@ public class MainMenuManager : MonoBehaviour
         {
             maskBlack.SetActive(false);
         }
+        ScaleMainMenuUi();
         DisableMainMenuButtonWrapping();
         CreateFeedbackButton();
         CreateFeedbackPanel();
+    }
+
+    /// <summary>统一缩小主标题与菜单按钮区域，背景和弹窗保持原尺寸。</summary>
+    private static void ScaleMainMenuUi()
+    {
+        const float scale = 0.9f;
+        string[] rootNames = { "gametitle", "menu panel" };
+        foreach (string rootName in rootNames)
+        {
+            GameObject root = GameObject.Find(rootName);
+            if (root != null)
+            {
+                root.transform.localScale = Vector3.one * scale;
+            }
+        }
     }
 
     private static void DisableMainMenuButtonWrapping()

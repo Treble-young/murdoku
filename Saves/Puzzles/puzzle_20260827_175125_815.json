@@ -188,7 +188,7 @@
     ],
     "regionNameOffsets": [
         {
-            "x": -135.0,
+            "x": -100.0,
             "y": 0.0
         },
         {
@@ -200,18 +200,18 @@
             "y": 0.0
         },
         {
-            "x": 0.0,
+            "x": -40.0,
             "y": -150.0
         }
     ],
     "placements": [
         {
-            "characterId": "D",
-            "cellIndex": 23
-        },
-        {
             "characterId": "E",
             "cellIndex": 0
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 23
         },
         {
             "characterId": "B",

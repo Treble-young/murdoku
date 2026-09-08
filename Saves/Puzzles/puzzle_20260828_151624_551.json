@@ -278,28 +278,28 @@
             "cellIndex": 4
         },
         {
-            "characterId": "D",
-            "cellIndex": 15
-        },
-        {
-            "characterId": "C",
-            "cellIndex": 12
-        },
-        {
             "characterId": "B",
             "cellIndex": 21
+        },
+        {
+            "characterId": "D",
+            "cellIndex": 15
         },
         {
             "characterId": "E",
             "cellIndex": 34
         },
         {
-            "characterId": "F",
-            "cellIndex": 37
+            "characterId": "C",
+            "cellIndex": 12
         },
         {
             "characterId": "V",
             "cellIndex": 45
+        },
+        {
+            "characterId": "F",
+            "cellIndex": 37
         }
     ],
     "clues": [
@@ -329,7 +329,7 @@
         },
         {
             "characterId": "E",
-            "clue": "在阅读区，  且有一名男性也在这个区域",
+            "clue": "在阅读区，还有一名男性在阅读区",
             "name": "Emma",
             "gender": 2
         },
@@ -346,6 +346,6 @@
             "gender": 1
         }
     ],
-    "difficulty": 2,
+    "difficulty": 3,
     "globalClue": "只有一个人在盆栽旁边"
 }

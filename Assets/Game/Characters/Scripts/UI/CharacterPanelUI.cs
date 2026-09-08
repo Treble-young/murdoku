@@ -44,6 +44,11 @@ namespace Murdoku.Characters
 
         public CharacterPortraitCatalog PortraitCatalog => portraitCatalog;
 
+        /// <summary>运行时创建的全局线索底板，供交互教程高亮。</summary>
+        public RectTransform GlobalClueRoot => globalClueText == null
+            ? null
+            : globalClueText.transform.parent as RectTransform;
+
         public void OnDrop(PointerEventData eventData)
         {
             if (eventData == null || eventData.pointerDrag == null)
